@@ -24,11 +24,14 @@ import torch
 import myutils
 from calc_auroc import plot_roc_curve, roc_curve_path_from_checkpoint
 from checkpoint_utils import build_train_checkpoint
-from model_base4 import LinkPredict, load_or_compute_ppr_sparse
+from model_base4 import (LinkPredict, EncoderConfig, add_model_arguments,
+                         load_or_compute_ppr_sparse, set_global_seed)
 from data_loader import Data
 
 
 def main(args):
+    set_global_seed(args.seed)
+    cfg = EncoderConfig.from_args(args)
     args.data = resolve_data_dir(args.data)
     args.model_state_file = ensure_parent(resolve_path(args.model_state_file))
     if args.roc_save_path:
@@ -147,9 +150,7 @@ def main(args):
         pretrained_domain_embeddings=ontology_embeddings,
         freeze=freeze,
         w=args.w,
-        use_ppr=args.use_ppr,
-        ppr_num_layers=args.ppr_num_layers,
-        ppr_fanout=args.ppr_fanout,
+        config=cfg,
     )
     model = model.to(device)
     print(device)
@@ -199,7 +200,8 @@ def main(args):
         optimizer.step()
 
         if iteration % args.evaluate_every == 0:
-            print("Epoch {} | Loss {:.5f}".format(iteration, loss.item()))
+            print("Epoch {} | Loss {:.5f} | ppr_gate {:.4f}".format(
+                iteration, loss.item(), model.ppr_gate_value()))
 
         optimizer.zero_grad()
 
@@ -362,19 +364,8 @@ if __name__ == "__main__":
         help="ROC plot path. Default: same folder as model_state_file, file roc_curve.png",
     )
 
-    parser.add_argument(
-        "--use_ppr", dest="use_ppr",
-        type=lambda x: str(x).lower() in ("1", "true", "yes"),
-        default=True,
-        help="Enable auxiliary PPR network branch (HGDC-style).",
-    )
     parser.add_argument("--ppr_c", dest="ppr_c", type=float, default=0.15)
     parser.add_argument("--ppr_eps", dest="ppr_eps", type=float, default=1e-4)
-    parser.add_argument("--ppr_num_layers", dest="ppr_num_layers", type=int, default=2)
-    parser.add_argument(
-        "--ppr_fanout", dest="ppr_fanout", type=int, default=50,
-        help="So hang xom PPR moi lop luc train. -1 = tat ca. Mac dinh 50 (= ppr_topk) de train/eval khop.",
-    )
     parser.add_argument(
         "--ppr_iterative", dest="ppr_iterative",
         type=lambda x: str(x).lower() in ("1", "true", "yes"),
@@ -386,6 +377,14 @@ if __name__ == "__main__":
         "--ppr_topk", dest="ppr_topk", type=int, default=50,
         help="So canh PPR toi da giu lai moi node khi dung Gppr.",
     )
+
+    parser.add_argument(
+        "--seed", dest="seed", type=int, default=42,
+        help="Seed cho random/numpy/torch/dgl. Doi seed giua cac lan chay ablation.",
+    )
+
+    # Toan bo cong tac ablation cua encoder (xem docstring model_base4.py).
+    add_model_arguments(parser)
 
     args = parser.parse_args()
     main(args)
