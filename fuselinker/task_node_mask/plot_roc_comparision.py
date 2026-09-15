@@ -40,6 +40,9 @@ subplot t��ng �ng s� ��c v� tr�ng v� in c�nh b�o. B�n c
 
 from __future__ import annotations
 
+import task_setup  # noqa: F401
+from paths import ROOT, ensure_parent, resolve_path
+
 import argparse
 import os
 import sys
@@ -265,9 +268,9 @@ def evaluate_checkpoint(
         except Exception as exc2:
             raise RuntimeError(f"Failed to load checkpoint even with strict=False: {exc2}")
 
-    # ----- Build eval graph (ch� d�ng train edges, tr�nh leak test) -----
+    # FuseLinker gốc (main.py): encode trên graph dựng từ test.tsv.
     eval_graph, eval_rel_np, eval_norm_np = myutils.build_graph(
-        num_nodes, num_rels, train_data_np
+        num_nodes, num_rels, test_data_np
     )
     eval_node_id = torch.arange(0, num_nodes, dtype=torch.long).view(-1, 1)
     eval_rel = torch.from_numpy(eval_rel_np).to(device)
@@ -422,27 +425,26 @@ def parse_args() -> argparse.Namespace:
         description="V� � th� ROC so s�nh Base vs Upgrade tr�n nhi�u dataset + embedding.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--root", default=".",
-                   help="Th� m�c g�c ch�a c�c dataset.")
+    p.add_argument("--root", default=str(ROOT),
+                   help="Thu muc goc chua cac dataset (mac dinh: fuselinker/).")
     p.add_argument("--datasets", nargs="+",
                    default=["hetionet", "suppkg", "kegg50k"],
-                   help="Danh s�ch t�n dataset (th� m�c con trong root).")
+                   help="Danh sach ten dataset (thu muc con trong root).")
     p.add_argument("--embeddings", nargs="+",
                    default=["pubmedbert", "flant5", "llama2", "pmcllama", "bert"],
-                   help="Danh s�ch embedding (th� m�c con trong <dataset>/checkpoints/).")
+                   help="Danh sach embedding.")
     p.add_argument("--checkpoint-dirname", default="checkpoints",
-                   help="T�n th� m�c checkpoint b�n trong m�i dataset.")
+                   help="Ten thu muc checkpoint (fuselinker/checkpoints/...).")
     p.add_argument("--checkpoint-filename", default="model_state.pth",
-                   help="T�n file checkpoint.")
+                   help="Ten file checkpoint.")
     p.add_argument("--embedding-file", default=None,
-                   help="Override file embedding (�p d�ng cho t�t c� dataset/embedding). "
-                        "N�u kh�ng c�, d�ng EMBEDDING_DEFAULTS.")
-    p.add_argument("--variants", nargs="+", default=["base", "upgrade"],
-                   help="C�c bi�n th� checkpoint c�n so s�nh (subfolder trong <embedding>/).")
+                   help="Override file embedding. Neu khong, dung EMBEDDING_DEFAULTS.")
+    p.add_argument("--variants", nargs="+", default=["model", "modelbase"],
+                   help="Cac bien the checkpoint (subfolder: model=base, modelbase=upgrade).")
     p.add_argument("--output", default="roc_comparison.png",
-                   help="File PNG �u ra.")
+                   help="File PNG dau ra (relative -> under fuselinker/).")
     p.add_argument("--title", default="ROC Comparison: Base vs Upgrade",
-                   help="Ti�u � c�a figure.")
+                   help="Tieu de cua figure.")
 
     # Si�u tham s� m� h�nh (ph�i kh�p l�c train)
     p.add_argument("--n-hidden", type=int, default=200)
@@ -470,7 +472,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def main(args: argparse.Namespace) -> None:
+    args.root = resolve_path(args.root)
+    args.output = ensure_parent(resolve_path(args.output))
     print("=" * 70)
+    print(f"Root:      {args.root}")
     print(f"Datasets:  {args.datasets}")
     print(f"Embeddings: {args.embeddings}")
     print(f"Variants:  {args.variants}")
@@ -584,4 +589,3 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     main(parse_args())
- 

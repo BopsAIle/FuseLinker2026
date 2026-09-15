@@ -1,0 +1,70 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# ---------- Môi trường ảo ----------
+.venv/
+venv/
+env/
+ENV/
+
+# ---------- Công cụ / cache ----------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.log
+
+# ---------- IDE / OS ----------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- Secrets ----------
+.env
+.env.*
+!.env.example
+
+# ---------- Checkpoints & trọng số mô hình ----------
+fuselinker/checkpoints/
+*.pth
+*.pt
+*.ckpt
+*.bin
+*.safetensors
+
+# ---------- Embeddings / mảng numpy lớn ----------
+*.npy
+*.npz
+
+# ---------- Dữ liệu knowledge graph (tải/chuẩn bị riêng) ----------
+fuselinker/*/train.tsv
+fuselinker/*/valid.tsv
+fuselinker/*/test.tsv
+fuselinker/*/train.txt
+fuselinker/*/valid.txt
+fuselinker/*/test.txt
+
+# ---------- Index map sinh lại được từ dữ liệu ----------
+*.pkl
+
+# ---------- Kết quả chạy ----------
+runs/
+outputs/
+wandb/
+roc_curve.png
+
+# Giữ lại tài liệu trong docs/
+!fuselinker/docs/**
+!fuselinker/**/docs/**

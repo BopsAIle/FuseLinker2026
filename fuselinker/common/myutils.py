@@ -260,7 +260,8 @@ def perturb_and_get_filtered_rank(emb, w, s, r, o, test_size, triplets_to_filter
         _, indices = torch.sort(scores, descending=True)
         rank = int((indices == target_idx).nonzero())
         ranks.append(rank)
-    return torch.LongTensor(ranks)
+    return torch.LongTensor(ranks) 
+    # Trả về chỉ số rank của từng cạnh thật trong mảng scores
 
 #Tính chỉ số MRR,MR và list_hist
 def _calc_mrr(emb, w, test_triplets, total_data, batch_size, neg_sample_size_eval, hits, filter=False):

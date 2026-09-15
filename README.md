@@ -17,21 +17,15 @@ Dự án được thiết kế để huấn luyện và đánh giá các mô hì
 
 ## Cấu trúc thư mục chính
 
+Hai nhiệm vụ tách riêng (sửa cái này không đụng cái kia). Chi tiết: [`fuselinker/README.md`](fuselinker/README.md)
+
 ```text
 fuselinker/
-  main.py                # huấn luyện mô hình chính
-  main2.py               # huấn luyện biến thể cơ bản
-  eval_auroc.py          # đánh giá AUROC từ checkpoint
-  plot_roc_comparision.py  # vẽ so sánh ROC trên nhiều dataset
-  data_loader.py
-  model.py
-  model_base2.py
-  model_base4.py
-  checkpoints/           # lưu checkpoint và ROC plots
-  hetionet/              # dữ liệu hetionet
-  suppkg/                # dữ liệu suppkg
-  kegg50k/               # dữ liệu kegg50k
-  adint/                 # dữ liệu adint
+  task_node_mask/        # DistMult: dự đoán entity bị mask (gốc)
+  task_degree_edge/      # SSL: bậc node + cạnh mask
+  common/                # data_loader, myutils, calc_auroc, ...
+  checkpoints/
+  hetionet/  suppkg/  kegg50k/  adint/
 ```
 
 ## Yêu cầu môi trường
@@ -76,10 +70,10 @@ Chạy từ thư mục `fuselinker/`:
 cd /home/anhlq/Documents/2026-ltt/FuseLinker/fuselinker
 ```
 
-Ví dụ huấn luyện trên `hetionet`:
+Nhiệm vụ 1 (DistMult, entity bị mask) — base:
 
 ```bash
-python main.py \
+python task_node_mask/train_base.py \
   --data hetionet \
   --text_embedding_file pubmedbert_pretrained_embeddings_768.npy \
   --knowledge_embedding_file poincare_embeddings.npy \
@@ -91,10 +85,10 @@ python main.py \
   --model_state_file checkpoints/hetionet/pubmedbert/model/model_state.pth
 ```
 
-Ví dụ huấn luyện biến thể cơ bản (không dùng PPR):
+Nhiệm vụ 1 — upgrade (PPR):
 
 ```bash
-python main2.py \
+python task_node_mask/train_upgrade.py \
   --data hetionet \
   --text_embedding_file pubmedbert_pretrained_embeddings_768.npy \
   --knowledge_embedding_file poincare_embeddings.npy \
@@ -103,15 +97,17 @@ python main2.py \
   --evaluate_every 1000 \
   --neg_sample_size_eval 100 \
   --w 0.75 \
-  --model_state_file checkpoints/hetionet/pubmedbert/model_state.pth
+  --model_state_file checkpoints/hetionet/pubmedbert/modelbase/model_state.pth
 ```
+
+Nhiệm vụ 2 (SSL bậc + cạnh mask): `task_degree_edge/train_base.py` và `train_upgrade.py`.
 
 ## Đánh giá AUROC từ checkpoint
 
 Sau khi đã có checkpoint, có thể đánh giá trực tiếp mà không cần huấn luyện lại:
 
 ```bash
-python eval_auroc.py \
+python task_node_mask/eval_auroc.py \
   --data hetionet \
   --text_embedding_file pmcllama_pretrained_embeddings_4096.npy \
   --knowledge_embedding_file poincare_embeddings.npy \
@@ -129,7 +125,7 @@ Kết quả sẽ gồm:
 Để so sánh ROC giữa các dataset như `hetionet`, `suppkg`, `kegg50k`:
 
 ```bash
-python plot_roc_comparision.py \
+python task_node_mask/plot_roc_comparision.py \
   --root . \
   --datasets hetionet suppkg kegg50k \
   --output roc_comparison.png \

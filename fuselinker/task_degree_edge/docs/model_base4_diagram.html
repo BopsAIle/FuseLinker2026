@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FuseLinker model_base4.py — Pipeline</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222d;
+      --panel2: #232d3b;
+      --stroke: #2e3a4a;
+      --text: #e8eef6;
+      --muted: #8b9bb0;
+      --accent: #5ec8a8;
+      --blue: #3d9cf0;
+      --gold: #e8a84a;
+      --purple: #c77dff;
+      --mono: "Cascadia Code", "Consolas", monospace;
+      --font: "Segoe UI", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.45;
+    }
+
+    header {
+      padding: 28px 32px 16px;
+      border-bottom: 1px solid var(--stroke);
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+
+    .shell {
+      border: 1px solid rgba(94, 200, 168, 0.4);
+      border-radius: 14px;
+      background: var(--panel);
+      padding: 18px;
+    }
+
+    .shell-title {
+      font-family: var(--mono);
+      font-size: 1rem;
+      font-weight: 650;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .shell-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    .box {
+      border: 1px solid var(--stroke);
+      border-radius: 10px;
+      background: var(--panel2);
+      padding: 14px 16px;
+    }
+
+    .box h3 {
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .box p, .box li {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .box ul {
+      margin: 6px 0 0 18px;
+    }
+
+    .arrow {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 8px 0;
+      user-select: none;
+    }
+
+    .arrow::before { content: "▼"; }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+      align-items: stretch;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 700px) {
+      .split { grid-template-columns: 1fr; }
+      .merge { order: 3; }
+      .parallel { grid-template-columns: 1fr !important; }
+      .parallel .mid { order: -1; }
+    }
+
+    .branch {
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid var(--stroke);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .branch h4 {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      margin-bottom: 6px;
+    }
+
+    .branch.domain h4 { color: var(--blue); }
+    .branch.text h4 { color: var(--gold); }
+    .branch.rgcn h4 { color: var(--accent); }
+    .branch.ppr h4 { color: var(--purple); }
+
+    .merge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-width: 96px;
+    }
+
+    .merge-badge {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--accent);
+      border: 1px solid rgba(94, 200, 168, 0.45);
+      background: rgba(94, 200, 168, 0.12);
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+
+    .merge-badge.gold {
+      color: var(--gold);
+      border-color: rgba(232, 168, 74, 0.45);
+      background: rgba(232, 168, 74, 0.1);
+    }
+
+    .formula {
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      color: var(--text);
+      background: rgba(0, 0, 0, 0.28);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-top: 10px;
+    }
+
+    .layer {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 10px 12px;
+      border: 1px solid var(--stroke);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.18);
+      margin-top: 8px;
+    }
+
+    .layer-idx {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding-top: 2px;
+    }
+
+    .layer strong {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+    }
+
+    .layer span {
+      display: block;
+      font-size: 0.76rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .parallel {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 10px;
+      align-items: stretch;
+      margin-top: 10px;
+    }
+
+    .mid {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .badge-parallel {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--gold);
+      border: 1px solid rgba(232, 168, 74, 0.4);
+      background: rgba(232, 168, 74, 0.1);
+      border-radius: 8px;
+      padding: 12px 10px;
+    }
+
+    .triplet {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 520px) {
+      .triplet { grid-template-columns: 1fr; }
+    }
+
+    .cell {
+      text-align: center;
+      padding: 12px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .cell strong {
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      margin-bottom: 3px;
+    }
+
+    .cell span {
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+
+    .score {
+      margin-top: 12px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--gold);
+      padding: 10px;
+      border: 1px dashed rgba(232, 168, 74, 0.4);
+      border-radius: 8px;
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.85em;
+      color: var(--accent);
+    }
+
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.72rem;
+      padding-bottom: 28px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Pipeline — <code>fuselinker/model_base4.py</code></h1>
+    <p>Luồng kiến trúc cải tiến: FusionGate · Residual RGCN · nhánh PPR phụ · DistMult.</p>
+  </header>
+
+  <main>
+    <div class="shell">
+      <div class="shell-title">LinkPredict</div>
+      <div class="shell-sub">
+        RGCN (num_rels×2) ∥ PPRBranch (Gppr) → FusionGate · DistMult
+      </div>
+
+      <!-- 1. Input -->
+      <div class="box">
+        <h3>1. Input</h3>
+        <ul>
+          <li>KG: <code>graph</code>, <code>node_ids</code>, <code>rel_ids</code>, <code>norm</code></li>
+          <li>Auxiliary: <code>ppr_graph</code>, <code>ppr_edge_weight</code>, <code>all_node_ids</code></li>
+          <li>pretrained text / domain embeddings · <code>w</code> (prior mềm) · <code>freeze</code></li>
+        </ul>
+      </div>
+
+      <div class="arrow"></div>
+
+      <!-- 2. EmbeddingLayer -->
+      <div class="box" style="border-color: rgba(94,200,168,0.4)">
+        <h3>2. EmbeddingLayer</h3>
+        <p>Projector riêng từng nguồn → <code>FusionGate</code> → + node-id residual.</p>
+
+        <div class="split">
+          <div class="branch domain">
+            <h4>Domain branch</h4>
+            <ul>
+              <li><code>domain_embeddings</code> (raw)</li>
+              <li><code>MLPProjector</code></li>
+              <li>Linear → ReLU → Drop → Linear → LN</li>
+            </ul>
+          </div>
+
+          <div class="merge">
+            <div class="merge-badge">FusionGate<br/>+ node_id</div>
+          </div>
+
+          <div class="branch text">
+            <h4>Text branch</h4>
+            <ul>
+              <li><code>text_embeddings</code> (raw)</li>
+              <li><code>TextEmbeddingAutoencoder</code></li>
+              <li>→ <code>LayerNorm</code> (text_post)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="formula">
+          gate = 0.5·σ(MLP([t,d,|t−d|,t⊙d])) + 0.5·w<br/>
+          h₀ = LN( gate·t + (1−gate)·d + residual([t,d]) ) + node_id_emb
+        </div>
+      </div>
+
+      <div class="arrow"></div>
+
+      <!-- 3. Parallel branches -->
+      <div class="box" style="border-color: rgba(232,168,74,0.4)">
+        <h3>3. Hai nhánh song song</h3>
+
+        <div class="parallel">
+          <!-- RGCN -->
+          <div class="branch rgcn">
+            <h4>Nhánh A · RGCN</h4>
+            <div class="layer">
+              <div class="layer-idx">Hidden × N</div>
+              <div>
+                <strong>ResidualRelGraphConvBlock</strong>
+                <span>
+                  LN → RelGraphConv (bdd) → residual<br/>
+                  LN → FFN (×4) → residual · (+ ReLU)
+                </span>
+              </div>
+            </div>
+            <div class="layer">
+              <div class="layer-idx">Aggregate</div>
+              <div>
+                <strong>Jumping Knowledge</strong>
+                <span>mean của mọi hidden layer outputs</span>
+              </div>
+            </div>
+            <div class="formula">h_rgcn = mean({h₁ … h_N})</div>
+          </div>
+
+          <div class="mid"><div class="badge-parallel">∥</div></div>
+
+          <!-- PPR -->
+          <div class="branch ppr">
+            <h4>Nhánh B · PPRBranch</h4>
+            <ul>
+              <li><code>encode_input(all_nodes)</code> → cùng EmbeddingLayer</li>
+              <li>N × <code>PPRGraphConv</code> trên Gppr</li>
+              <li>weighted sum · LN · Act · Dropout</li>
+              <li>gather về node trong subgraph</li>
+            </ul>
+            <div class="formula" style="margin-top:8px">
+              h' = Drop(Act(LN( Σ w<sub>uv</sub> · W h<sub>u</sub> )))
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow"></div>
+
+      <!-- PPR construction -->
+      <div class="box" style="border-color: rgba(199,125,255,0.4)">
+        <h3>Auxiliary network · compute_ppr_sparse</h3>
+        <ul>
+          <li>Từ train triples dựng A (đối xứng) → M = D<sup>−1/2</sup> A D<sup>−1/2</sup></li>
+          <li>PPR sparse (ε / top-k, streaming) → đồ thị thuần <code>Gppr</code> + edge_weight</li>
+          <li>Không có relation type (khác KG)</li>
+        </ul>
+      </div>
+
+      <div class="arrow"></div>
+
+      <!-- 4. Fusion -->
+      <div class="box" style="border-color: rgba(94,200,168,0.45)">
+        <h3>4. Fuse hai nhánh</h3>
+        <p><code>ppr_fusion = FusionGate(h_rgcn, h_ppr)</code></p>
+        <div class="formula">h = FusionGate(h_rgcn, h_ppr)</div>
+        <p style="margin-top:8px">Nếu không truyền PPR → chỉ trả <code>h_rgcn</code> (fallback hành vi cũ).</p>
+      </div>
+
+      <div class="arrow"></div>
+
+      <!-- 5. DistMult -->
+      <div class="box" style="border-color: rgba(232,168,74,0.4)">
+        <h3>5. DistMult scoring</h3>
+        <p><code>relation_weights</code> ∈ ℝ<sup>num_rels × hidden</sup> (pretrained hoặc Xavier).</p>
+
+        <div class="triplet">
+          <div class="cell">
+            <strong>h<sub>s</sub></strong>
+            <span>subject embedding</span>
+          </div>
+          <div class="cell">
+            <strong>r</strong>
+            <span>relation_weights[rel]</span>
+          </div>
+          <div class="cell">
+            <strong>h<sub>o</sub></strong>
+            <span>object embedding</span>
+          </div>
+        </div>
+
+        <div class="score">score = Σ (h<sub>s</sub> ⊙ r ⊙ h<sub>o</sub>)</div>
+      </div>
+    </div>
+  </main>
+
+  <footer>fuselinker/model_base4.py · architecture pipeline</footer>
+</body>
+</html>

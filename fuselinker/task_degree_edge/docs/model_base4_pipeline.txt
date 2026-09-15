@@ -1,0 +1,221 @@
+FuseLinker — model_base4.py  (model UPGRADE)
+================================================================================
+So với model.py (base): FusionGate thay weighted-avg,
+                        nhánh PPR song song, GPU batched PPR.
+                        RGCN hidden giữ RelGraphConv thuần như BaseRGCN.
+
++------------------------------------------------------------------------------+
+|  LinkPredict                                                                 |
+|  EmbeddingLayer  ->  [ RGCN  ||  PPRBranch(Gppr) ]  ->  FusionGate  ->  h    |
+|  DistMult (link predict)  |  SSL heads: EdgeTypeClassifier + DegreeClassifier|
++------------------------------------------------------------------------------+
+
+
+Tóm tắt luồng
+-------------
+
+                    pretrained text .npy          pretrained domain .npy
+                              |                              |
+                              v                              v
+  +--------+     +---------------------------+     +----------------------+
+  | Input  | --> | EmbeddingLayer            | --> | RelGraphConv x L     | --+
+  | KG + w |     | AE(text) || MLP(domain)   |     | (như BaseRGCN)       |   |
+  +--------+     | FusionGate(t, d, w)       |     +----------------------+   |
+                 +---------------------------+                                |
+                              |                                               |
+                              | encode_input(all nodes)                       |
+                              v                                               |
+                       +----------------------+                               |
+                       | PPRBranch trên Gppr  | ------------------------------+
+                       | (đồ thị thuần, top-k)|                               |
+                       +----------------------+                               |
+                                                                              v
+                                                       +------------+     +----------+
+                                                       | FusionGate | --> |    h     |
+                                                       | h_rgcn,h_ppr    +-----+----+
+                                                       +------------+          |
+                                                                               |
+                         +---------------------------+-------------------------+
+                         |                           |
+                         v                           v
+                  DistMult score              SSL (train_upgrade.py)
+                  sum(h_s o r o h_o)          EdgeHead + DegreeHead
+                                              loss = CE_edge + CE_deg
+
+
+================================================================================
+[1] INPUT
+================================================================================
+
+  KG (nhánh RGCN)          Aux (nhánh PPR)              Embeddings
+  ----------------         ----------------             ----------
+  graph                    ppr_graph (Gppr)             text   [N, d_text]
+  node_ids (subgraph)      ppr_edge_weight (~S_ij)      domain [N, d_dom]
+  rel_ids, norm            all_node_ids = arange(N)     w (prior mềm), freeze
+
+  Nếu ppr_graph / all_node_ids = None  ->  chỉ chạy RGCN (fallback base).
+
+
+================================================================================
+[2] EmbeddingLayer  (layer 0 của RGCN, dùng chung cho cả hai nhánh)
+================================================================================
+
+  +----------------------------+     +-------------------------------------+
+  | Domain branch              |     | Text branch                         |
+  |----------------------------|     |-------------------------------------|
+  | domain_embeddings (raw)    |     | text_embeddings (raw)               |
+  |          |                 |     |          |                          |
+  | MLPProjector               |     | TextEmbeddingAutoencoder            |
+  |   Linear -> ReLU -> Drop   |     |   Enc: Lin->BN->ReLU->Drop          |
+  |   -> Linear -> LayerNorm   |     |        -> Lin->BN                   |
+  |          |                 |     |   Dec: có module nhưng KHÔNG dùng   |
+  |      domain_x              |     |          |                          |
+  |                            |     | LayerNorm (text_post)               |
+  |                            |     |          |                          |
+  |                            |     |       text_x                        |
+  +------------|---------------+     +------------|------------------------+
+               |                                  |
+               +----------------+-----------------+
+                                |
+                                v
+                 +------------------------------------------+
+                 | FusionGate  (trọng số flex)              |
+                 |                                          |
+                 | gate = sigmoid( Linear([t, d]) )         |
+                 | gate = 0.5 * gate + 0.5 * w              |
+                 | h0   = gate * t + (1 - gate) * d         |
+                 +------------------------------------------+
+                                |
+                                v
+                               h0
+
+
+================================================================================
+[3] HAI NHÁNH SONG SONG
+================================================================================
+
+  +--------------------------------+     +-------------------------------------+
+  | Nhánh A · RGCN                 |     | Nhánh B · PPRBranch                 |
+  | (subgraph, có relation type)   |     | (toàn bộ N node, đồ thị thuần)      |
+  |--------------------------------|     |-------------------------------------|
+  |                                |     | encode_input(all_node_ids)          |
+  | RelGraphConv x L (như BaseRGCN)|     |   = EmbeddingLayer -> x_full        |
+  |                                |     |          |                          |
+  |   RelGraphConv(bdd)            |     | PPRGraphConv x ppr_num_layers       |
+  |     self_loop, dropout         |     |                                      |
+  |     ReLU trừ layer cuối        |     |   h' = Act( LN(                     |
+  |          |                     |     |          sum_{u in N(v)}            |
+  |   h_rgcn = output layer cuối   |     |            w_uv * W h_u ))          |
+  |                                |     |                                      |
+  |                                |     | Act = ReLU trừ layer cuối           |
+  |                                |     |          |                          |
+  |                                |     | h_ppr_full  [N, hidden]             |
+  |                                |     | gather: h_ppr = h_ppr_full[ids]     |
+  |                                |     |          |                          |
+  |                                |     |       h_ppr                         |
+  |                                |     |                                     |
+  +------------|-------------------+     +------------|------------------------+
+               |                                      |
+               +------------------+-------------------+
+                                  |
+                                  v
+                   +----------------------------------+
+                   | [4] ppr_fusion = FusionGate      |
+                   | gate = sigmoid(Linear([rgcn,ppr]))|
+                   | h = gate*h_rgcn + (1-gate)*h_ppr |
+                   +----------------------------------+
+                                  |
+                                  v
+                                  h
+
+
+================================================================================
+[5] Auxiliary network · compute_ppr_sparse  (dựng Gppr, chạy 1 lần trước train)
+================================================================================
+
+  train triples (src, rel, dst)
+            |
+            v
+  A  = adjacency đối xứng, unweighted  (+ self-loop)
+  M  = D^{-1/2} A D^{-1/2}             (transition, HGDC)
+            |
+            v
+  PPR:  S <- c * M S + (1-c) E         (iterative, theo batch cột)
+    hoặc S  = (1-c) (I - c M)^{-1}     (closed-form, N nhỏ)
+
+  Backend (tự chọn, có fallback):
+    CUDA iterative batched DGL  ->  CUDA dense inverse
+    -> CPU batched DGL          ->  CPU sparse streaming (từng node)
+            |
+            v
+  Sparse ~S :  bỏ self-loop, cắt |S_ij| < epsilon, giữ top-k / node
+            |
+            v
+  Gppr + edge_weight     đồ thị thuần, KHÔNG có relation type
+
+
+  Công thức (HGDC):
+    s_i = c M s_i + (1-c) e_i
+    PPR(s_i) = (1-c) (I - c M)^{-1} e_i
+    S        = (1-c) (I - c M)^{-1}
+
+
+================================================================================
+[6a] DistMult  (link prediction — calculate_score / get_loss)
+================================================================================
+
+  relation_weights in R^{num_rels x hidden}   (pretrained hoặc Xavier)
+
+  +----------------+   +---------------------+   +----------------+
+  | h_s            |   | r                   |   | h_o            |
+  | (subject emb)  |   | (relation_weights)  |   | (object emb)   |
+  +--------+-------+   +----------+----------+   +--------+-------+
+           |                      |                       |
+           +----------------------+-----------------------+
+                                  |
+                                  v
+               +------------------------------------------+
+               |  score = sum( h_s  o  r  o  h_o )        |
+               |  loss  = BCE(score, labels) + lam * L2   |
+               +------------------------------------------+
+
+
+================================================================================
+[6b] SSL heads  (train_upgrade.py — KHÔNG dùng DistMult)
+================================================================================
+
+  Mask cạnh khỏi message-passing graph (lukepi_graph).
+  Encoder chạy trên đồ thị đã mask -> h
+
+  +------------------------------------+     +-------------------------------+
+  | EdgeTypeClassifier                 |     | DegreeClassifier              |
+  |------------------------------------|     |-------------------------------|
+  | cat(h_src, h_dst)                  |     | Linear -> ReLU -> Drop        |
+  | Linear -> ReLU -> Drop -> Linear   |     | -> Linear                     |
+  | num_classes = num_rels + 1         |     | num_classes = num_degree_bins |
+  | (R loại thật + 1 lớp fake edge)    |     | (bucket bậc, tính 1 lần)      |
+  +-----------------|------------------+     +--------------|----------------+
+                    |                                       |
+                    v                                       v
+              CE(edge logits)                         CE(degree logits)
+                    |                                       |
+                    +------------------+--------------------+
+                                       |
+                                       v
+                         loss = loss_edge + loss_node
+
+
+================================================================================
+Khác biệt vs model.py (base)
+================================================================================
+
+  Thành phần              base (model.py)              upgrade (model_base4)
+  ----------------------  ---------------------------  -----------------------------
+  Trộn text/domain        (1-w)*domain + w*text        flex gate + prior w (không LN)
+  Domain path             min-max + Poincare Linear    MLPProjector (không Poincare)
+  Text path               AE + min-max                 AE + LayerNorm (không min-max)
+  RGCN hidden             RelGraphConv thuần           RelGraphConv thuần (như base)
+  Layer aggregate         layer cuối                   layer cuối (không JK)
+  Cấu trúc phụ            không                        PPRBranch trên Gppr
+  Fuse hai nhánh          --                           FusionGate(h_rgcn, h_ppr)
+  Fallback không PPR      --                           trả h_rgcn (giống 1 nhánh)

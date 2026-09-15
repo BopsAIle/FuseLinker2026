@@ -1,0 +1,35 @@
+Do do SSL: du doan canh mask va bac node
+================================================
+
+Hai nhiem vu SSL trong train_base.py / train_upgrade.py (qua ssl_eval.py) la phan loai nhieu lop.
+Log moi epoch tach 2 task, trung binh tren batch train.
+
+Dong log:
+
+  Training average | step N | [EDGE]   loss ... auc ... aupr ... f1 ... bacc ... w ...
+  Training average | step N | [DEGREE] loss ... auc ... aupr ... f1 ... bacc ... w ...
+  TEST             | step N | [EDGE]   loss ... auc ... aupr ... f1 ... bacc ... w ...
+  TEST             | step N | [DEGREE] loss ... auc ... aupr ... f1 ... bacc ... w ...
+
+
+Bang tom tat
+------------
+Token       Do do                         Huong tot
+loss        CE cua task (thô)             thap hon
+auc         macro OVR AUC                 cao hon
+aupr        macro average precision       cao hon
+f1          Macro-F1                      cao hon
+bacc        balanced accuracy             cao hon
+
+
+Cach tinh
+=========
+
+Softmax tren logits -> xac suat theo lop. Nhan la class-id.
+
+AUC  — macro one-vs-rest AUROC tren cac lop co ca mau duong/am.
+AUPR — macro average precision (khong noi suy).
+F1   — Macro-F1 tren cac lop xuat hien trong nhan.
+BACC — trung binh recall theo lop co trong nhan.
+
+loss dung de chon best checkpoint (valid edge CE, khong in moi epoch).

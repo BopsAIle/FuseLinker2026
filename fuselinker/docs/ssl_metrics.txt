@@ -1,0 +1,95 @@
+Do do SSL: du doan canh mask va bac node
+================================================
+
+Hai nhiem vu SSL trong main.py / main3.py (qua ssl_eval.py) la phan loai nhieu lop.
+Do do bao cao giong bo LukePi finetune: AUC, AUPR, F1, BACC
+(cong them CE loss de theo doi train / chon checkpoint).
+
+Dong log:
+
+  Training average | step N | [EDGE]   loss ... auc ... aupr ... f1 ... bacc ... w ...
+  Training average | step N | [DEGREE] loss ... auc ... aupr ... f1 ... bacc ... w ...
+  TEST             | step N | [EDGE]   loss ... auc ... aupr ... f1 ... bacc ... w ...
+  TEST             | step N | [DEGREE] loss ... auc ... aupr ... f1 ... bacc ... w ...
+
+
+Bang tom tat
+------------
+Token       Do do                    Huong tot
+le          Edge CE loss             thap hon
+auc         Edge macro OVR AUC       cao hon
+aupr        Edge macro AUPR (AP)     cao hon
+f1          Edge Macro-F1            cao hon
+bacc        Edge BACC                cao hon
+deg_ln      Degree CE loss           thap hon
+deg_auc     Degree macro OVR AUC     cao hon
+deg_aupr    Degree macro AUPR (AP)   cao hon
+deg_f1      Degree Macro-F1          cao hon
+deg_bacc    Degree BACC              cao hon
+
+
+Cach tinh (chung cho ca hai nhiem vu)
+=====================================
+
+Softmax tren logits -> xac suat theo lop. Nhan la class-id (khong phai binary).
+
+AUC  — macro one-vs-rest AUROC
+  Voi moi lop c co trong nhan va co ca mau duong/am:
+    AUC_c = Wilcoxon-Mann-Whitney tren score[:, c]
+  AUC = trung binh AUC_c
+  (tuong duong sklearn roc_auc_score average='macro' dang OVR)
+
+AUPR — macro average precision
+  Voi moi lop c nhu tren:
+    AUPR_c = average precision (khong noi suy) tren score[:, c]
+  AUPR = trung binh AUPR_c
+  (tuong duong sklearn average_precision_score average='macro')
+
+F1 — Macro-F1
+  F1_c = 2 * P_c * R_c / (P_c + R_c) voi lop c co trong nhan
+  macro-F1 = trung binh cac F1_c
+  Lop khong xuat hien trong batch labels bi bo qua.
+
+BACC — Balanced accuracy
+  BACC = trung binh recall theo lop co trong nhan
+  (sklearn balanced_accuracy_score)
+
+
+1) Nhiem vu canh mask
+=====================
+
+Head nhan embedding (src, dst) va chon 1 trong (num_rels + 1) lop:
+  - lop 0 ... num_rels-1 : loai quan he that
+  - lop num_rels         : canh gia (negative)
+
+Eval:
+  - Positive: triple held-out (s, r, o), nhan = r
+  - Negative: cap (s, o) khong co trong graph, nhan = num_rels
+
+le van dung de chon best checkpoint (valid_le).
+auc / aupr do kha nang xep hang; f1 / bacc do doan lop sau argmax.
+
+
+2) Nhiem vu bac node
+====================
+
+Nhan la bucket bac tren train graph (mac dinh log2(deg+1), K=10 bins).
+Head nhan embedding node -> doan bin [0 ... K-1].
+
+deg_auc / deg_aupr: probe cau truc (hub vs node it lien ket) theo score.
+deg_f1 / deg_bacc: cong bang hon acc khi phan bo bac power-law.
+
+
+Uu tien khi so 2 model
+======================
+1. Canh: auc, aupr, roi f1 / bacc
+2. Bac:  deg_auc, deg_aupr, roi deg_f1 / deg_bacc
+3. le / deg_ln: theo doi train / chon checkpoint
+
+
+Tham chieu code
+===============
+- Tinh toan: ssl_eval.py
+  (compute_clf_metrics, evaluate_ssl_edge, evaluate_ssl_degree)
+- Log format: format_ssl_log / format_ssl_log_edge / format_ssl_log_node
+- Train/eval: train_base.py (baseline), train_upgrade.py (upgrade)
