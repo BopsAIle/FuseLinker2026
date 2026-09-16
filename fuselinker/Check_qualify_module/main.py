@@ -165,13 +165,13 @@ def main(args):
     test_data = torch.LongTensor(test_data_np)
     total_data = torch.LongTensor(total_data_np)
 
-    # Dùng đồ thị train để tính embedding (chuẩn link prediction), không dùng test graph
-    eval_graph = train_graph.to(device)
+    # FuseLinker gốc (TheYKXiao/FuseLinker, main.py dòng 151-158): encode trên
+    # đồ thị dựng từ test.tsv. Các triple được chấm điểm vẫn là test_data — chỉ
+    # đồ thị lan truyền thông điệp đổi từ train sang test.
+    eval_graph = test_graph.to(device)
     eval_node_id = test_node_id.to(device)
-    eval_rel = torch.from_numpy(train_rel).to(device)
-    eval_norm = myutils.node_norm_2_edge_norm(
-        train_graph, torch.from_numpy(train_norm).view(-1, 1)
-    ).to(device)
+    eval_rel = test_rel.to(device)
+    eval_norm = test_norm.to(device)
     test_data = test_data.to(device)
     total_data = total_data.to(device)
 

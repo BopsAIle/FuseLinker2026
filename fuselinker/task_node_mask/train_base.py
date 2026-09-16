@@ -157,11 +157,21 @@ def main(args):
     test_data = torch.LongTensor(test_data_np)
     total_data = torch.LongTensor(total_data_np)
 
-    eval_graph = test_graph.to(device)
+    # --eval_graph quyet dinh do thi dung de LAN TRUYEN THONG DIEP khi sinh
+    # embedding. Ca hai lua chon deu cham diem tren dung cac triple cua test.tsv.
+    #   test  = FuseLinker goc (TheYKXiao/main.py): canh test nam trong do thi
+    #           ma hoa -> ro ri thong tin, chi so xep hang cao hon.
+    #   train = fork BopsAIle/main.py: chi dung canh train -> chat che hon.
+    if args.eval_graph == "train":
+        src_graph, src_rel, src_norm = train_graph, train_rel, train_norm
+    else:
+        src_graph, src_rel, src_norm = test_graph, test_rel, test_norm
+    print(f"Eval encode tren: {args.eval_graph}_graph")
+    eval_graph = src_graph.to(device)
     eval_node_id = test_node_id.to(device)
-    eval_rel = torch.from_numpy(test_rel).to(device)
+    eval_rel = torch.from_numpy(src_rel).to(device)
     eval_norm = myutils.node_norm_2_edge_norm(
-        test_graph, torch.from_numpy(test_norm).view(-1, 1)
+        src_graph, torch.from_numpy(src_norm).view(-1, 1)
     ).to(device)
     test_data = test_data.to(device)
     total_data = total_data.to(device)
@@ -284,6 +294,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--neg_sample_size_eval", dest="neg_sample_size_eval", type=int, default=20,
+    )
+    parser.add_argument(
+        "--eval_graph", dest="eval_graph", choices=["test", "train"], default="test",
+        help="Do thi de sinh embedding luc eval. test = FuseLinker goc "
+             "(TheYKXiao); train = fork BopsAIle/main.py. Ca hai deu cham "
+             "diem tren test.tsv.",
     )
     parser.add_argument(
         "--eval_protocol", dest="eval_protocol", default="filtered",
