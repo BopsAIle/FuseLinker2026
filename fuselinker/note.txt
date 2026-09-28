@@ -5,6 +5,39 @@ python task_degree_edge/train_base.py `
   --text_embedding_file bert_pretrained_embeddings_768.npy `
   --knowledge_embedding_file poincare_embeddings.npy `
   --num_hidden_layers 2 `
+  --iterations 40000 `
+  --evaluate_every 1000 `
+  --graph_batch_size 1024 `
+  --mask_rate 0.2 `
+  --negative_sample 20 `
+  --num_degree_bins 10 `
+  --degree_bin_strategy quantile `
+  --w 0.75 `
+  --ssl_model_state_file checkpoints/hetionet/pubmedbert/ssl_base/ssl_model_state.pth
+
+
+
+cd D:\FuseLinker2026\fuselinker
+python task_node_mask/train_base.py `
+  --data suppkg `
+  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy `
+  --knowledge_embedding_file poincare_embeddings.npy `
+  --num_hidden_layers 2 `
+  --iterations 40000 `
+  --evaluate_every 1000 `
+  --negative_sample 20 `
+  --neg_sample_size_eval 100 `
+  --w 0.75 `
+  --model_state_file checkpoints/hetionet/pubmedbert/model/model_state.pth
+
+Hiện tại mình muốn so sánh model_base4.py và model.py để so sánh các module nào sẽ có lợi cho 
+việc train. 
+cd D:\FuseLinker2026\fuselinker
+python task_degree_edge/train_base.py `
+  --data suppkg `
+  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy `
+  --knowledge_embedding_file poincare_embeddings.npy `
+  --num_hidden_layers 2 `
   --iterations 50 `
   --evaluate_every 1 `
   --graph_batch_size 1024 `
@@ -12,5 +45,8 @@ python task_degree_edge/train_base.py `
   --negative_sample 1 `
   --num_degree_bins 10 `
   --degree_bin_strategy quantile `
+  --degree_on_full false `
   --w 0.75 `
   --ssl_model_state_file checkpoints/hetionet/pubmedbert/ssl_base/ssl_model_state.pth
+
+train_base

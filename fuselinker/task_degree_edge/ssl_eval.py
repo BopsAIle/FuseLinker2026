@@ -10,13 +10,24 @@ Log mỗi epoch tách 2 task: loss, auc, aupr, f1, bacc (và bản node).
 from __future__ import annotations
 
 import os
+import random
 
+import dgl
 import numpy as np
 import torch
 import torch.nn.functional as F
 
 import myutils
 from checkpoint_utils import build_train_checkpoint
+
+
+def seed_everything(seed):
+    """Seed model initialization, dropout and graph samplers."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    dgl.seed(seed)
+    dgl.random.seed(seed)
 
 
 def _to_numpy_int(x):
@@ -283,7 +294,6 @@ def evaluate_ssl_degree(embed, degree_head, degree_label_full):
     }
 
 
-@torch.no_grad()
 def encode_full_train_graph(
     model,
     train_graph,
@@ -303,13 +313,15 @@ def encode_full_train_graph(
     eval_norm = myutils.node_norm_2_edge_norm(
         train_graph, torch.from_numpy(train_norm).view(-1, 1)
     ).to(device)
-    return model(
-        eval_graph,
-        eval_node_id,
-        eval_rel,
-        eval_norm,
-        **encode_kwargs,
-    )
+    # Degree supervision needs encoder gradients. Evaluation remains detached.
+    with torch.set_grad_enabled(model.training and torch.is_grad_enabled()):
+        return model(
+            eval_graph,
+            eval_node_id,
+            eval_rel,
+            eval_norm,
+            **encode_kwargs,
+        )
 
 
 def build_degree_labels(train_deg, num_bins, strategy="log"):
@@ -368,7 +380,18 @@ def build_ssl_checkpoint(
         "num_degree_bins": args.num_degree_bins,
         "degree_bin_strategy": args.degree_bin_strategy,
         "degree_bin_edges": degree_bin_edges,
+        "seed": getattr(args, "seed", None),
+        "degree_on_full": getattr(args, "degree_on_full", False),
     }
+    if model_module == 'model_base4':
+        checkpoint['meta']['ssl']['architecture_version'] = 'masked_global_ppr_mass_v2'
+        checkpoint['meta']['ssl']['ppr_c'] = getattr(args, 'ppr_c', 0.85)
+        checkpoint['meta']['ssl']['ppr_iterations'] = getattr(args, 'ppr_iter_num', 8)
+        checkpoint['meta']['ssl']['ppr_num_layers'] = getattr(args, 'ppr_num_layers', 2)
+        checkpoint['meta']['ssl']['degree_prior_correction'] = bool(
+            getattr(args, 'degree_prior_correction', False)
+            and (getattr(args, 'degree_on_full', False)
+                 or getattr(args, 'edge_sampler', 'uniform') == 'uniform'))
     if loss_weighter is not None:
         checkpoint["ssl_heads"]["loss_weighter"] = loss_weighter.state_dict()
         w_edge, w_node = loss_weighter.weights()

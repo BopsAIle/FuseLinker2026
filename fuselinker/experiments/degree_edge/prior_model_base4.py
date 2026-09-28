@@ -77,12 +77,10 @@ import scipy.sparse as sp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.checkpoint import checkpoint
 
 # SSL uses feature-space PPR on the *visible* graph, never a global graph
 # containing the reconstruction targets. No dense N x N matrix is needed.
 MASK_SAFE_PPR = True
-GLOBAL_MASKED_PPR = True
 
 
 # ================================================================
@@ -493,34 +491,6 @@ class PPRGraphConv(nn.Module):
         return h
 
 
-def _diffuse_features(graph, x, inv, c, steps):
-    with graph.local_scope():
-        h = x
-        for _ in range(steps):
-            graph.ndata['ppr_h'] = h * inv
-            graph.update_all(fn.copy_u('ppr_h', 'm'), fn.sum('m', 'ppr_sum'))
-            h = c * (graph.ndata['ppr_sum'] + h * inv) * inv + (1-c) * x
-        return h
-
-
-class _PPRDiffusion(torch.autograd.Function):
-    """Exact adjoint of finite PPR, without retaining each walk activation."""
-    @staticmethod
-    def forward(ctx, x, graph, c, steps):
-        inv = (graph.in_degrees().to(x.dtype) + 1).rsqrt().unsqueeze(-1)
-        ctx.graph, ctx.c, ctx.steps = graph, c, steps
-        ctx.save_for_backward(inv)
-        return _diffuse_features(graph, x, inv, c, steps)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        (inv,) = ctx.saved_tensors
-        # Use the original normalization even for a directed caller's graph.
-        transpose = dgl.reverse(ctx.graph, copy_ndata=False, copy_edata=False)
-        grad_x = _diffuse_features(transpose, grad_output, inv, ctx.c, ctx.steps)
-        return grad_x, None, None, None
-
-
 class PPRBranch(nn.Module):
     """
     Nhánh phụ chạy trên toàn bộ num_nodes với auxiliary network Gppr.
@@ -536,7 +506,6 @@ class PPRBranch(nn.Module):
             raise ValueError('PPR requires layers >= 1, 0 <= c < 1, iterations >= 1')
         self.c = float(c)
         self.num_iter = int(num_iter)
-        self.mass_projection = nn.Linear(1, hidden_dim, bias=False)
         self.layers = nn.ModuleList([
             PPRGraphConv(
                 hidden_dim, hidden_dim,
@@ -546,27 +515,34 @@ class PPRBranch(nn.Module):
             for i in range(num_layers)
         ])
 
-    def diffuse(self, graph, x):
-        # S 1 retains structural mass that feature LayerNorm would remove.
-        ones = x.new_ones((x.shape[0], 1))
-        return _PPRDiffusion.apply(torch.cat((x, ones), dim=-1), graph, self.c, self.num_iter)
+    def forward(self, graph, x, edge_weight=None):
+        """Apply S X via h <- c M h + (1-c) X on visible edges only.
 
-    def project(self, h):
-        mass = h[:, -1:].clamp_min(1e-8).log() / max(self.c, 1e-6)
-        h = h[:, :-1]
+        M is the symmetric normalized adjacency including one self loop.
+        Train and eval use the same operator, with no fanout-dependent scaling.
+        The supplied RGCN graph already contains reverse edges; parallel
+        relations contribute multiplicity to its adjacency.
+        """
+        with graph.local_scope():
+            inv = (graph.in_degrees().to(x.dtype) + 1).rsqrt().unsqueeze(-1)
+            h = x
+            for _ in range(self.num_iter):
+                graph.ndata['ppr_h'] = h * inv
+                graph.update_all(fn.copy_u('ppr_h', 'm'), fn.sum('m', 'ppr_sum'))
+                propagated = (graph.ndata['ppr_sum'] + h * inv) * inv
+                h = self.c * propagated + (1 - self.c) * x
         for layer in self.layers:
             h = layer.act(layer.norm(layer.linear(h)))
-        return h + self.mass_projection(mass)
-
-    def forward(self, graph, x, edge_weight=None):
-        return self.project(self.diffuse(graph, x))
+        return h
 
 #Hàm biến đổi text embedding về chiều cùng chiều với domain embedding
 class TextEmbeddingAutoencoder(nn.Module):
     def __init__(self, input_dim, encoding_dim, dropout_rate=0.2):
         super(TextEmbeddingAutoencoder, self).__init__()
-        # Per-node normalization permits chunked full-graph encoding without
-        # changing features with chunk size or maintaining batch running stats.
+        # LayerNorm thay cho BatchNorm1d: encoder được gọi cả trên subgraph (nhánh RGCN)
+        # lẫn trên toàn bộ N node (nhánh PPR) trong cùng một forward, nên BatchNorm sẽ
+        # nhiễm running-stats giữa 2 phân phối batch và lệch train/eval. LayerNorm chuẩn
+        # hóa theo từng sample -> nhất quán, không phụ thuộc kích thước batch.
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, encoding_dim * 2),
             nn.LayerNorm(encoding_dim * 2),
@@ -740,9 +716,7 @@ class EmbeddingLayer(nn.Module):
                     f"`srcIndex < srcSelectDimSize`."
                 )
             domain_embeddings = torch.from_numpy(pretrained_domain_embeddings).float()
-            domain_embeddings = (
-                domain_embeddings - domain_embeddings.mean(0, keepdim=True)
-            ) / domain_embeddings.std(0, unbiased=False, keepdim=True).clamp_min(1e-6)
+            domain_embeddings = (domain_embeddings - domain_embeddings.mean(0, keepdim=True)) / domain_embeddings.std(0, unbiased=False, keepdim=True).clamp_min(1e-6)
             self.domain_embeddings = nn.Embedding.from_pretrained(
                 domain_embeddings, freeze=freeze
             )
@@ -905,8 +879,6 @@ class DegreeClassifier(nn.Module):
         labels = labels.to(degrees.device)
         if full_graph:
             inclusion = torch.ones_like(degrees)
-        elif sample_size >= num_edges:
-            inclusion = (degrees > 0).to(degrees.dtype)
         else:
             fraction = (degrees / max(int(num_edges), 1)).clamp(0, 1 - 1e-7)
             inclusion = -torch.expm1(min(sample_size, num_edges) * torch.log1p(-fraction))
@@ -935,7 +907,7 @@ class LinkPredict(nn.Module):
                  pretrained_text_embeddings=None, pretrained_domain_embeddings=None,
                  pretrained_relation_embeddings=None, freeze=False, w=0.5,
                  use_ppr=True, ppr_num_layers=2, ppr_fanout=15,
-                 ppr_c=0.85, ppr_iterations=8):
+                 ppr_c=0.15, ppr_iterations=8):
         super(LinkPredict, self).__init__()
 
         # giữ đúng convention cũ: num_relations * 2 cho graph conv
@@ -988,52 +960,23 @@ class LinkPredict(nn.Module):
         return score
 
     def forward(self, graph, node_ids, rel_ids, norm,
-                ppr_graph=None, ppr_edge_weight=None, all_node_ids=None,
-                context_graph=None, masked_pairs=None):
-        """RGCN on the batch, PPR on train context with target pairs removed.
-
-        Legacy precomputed PPR arguments are ignored because target influence
-        cannot be removed reliably from an already diffused adjacency.
+                ppr_graph=None, ppr_edge_weight=None, all_node_ids=None):
         """
-        ids = node_ids.reshape(-1)
-        if self.use_ppr and context_graph is not None:
-            if context_graph.num_nodes() != self.rgcn.num_nodes:
-                raise ValueError('Context graph must use global node IDs')
-            context = context_graph
-            if self.training:
-                if masked_pairs is None:
-                    raise ValueError('Training with global context requires masked_pairs')
-                src, dst = context.edges()
-                pairs = masked_pairs.to(src.device).reshape(-1, 2)
-                n = context.num_nodes()
-                excluded = torch.cat((pairs[:, 0] * n + pairs[:, 1],
-                                      pairs[:, 1] * n + pairs[:, 0]))
-                keep = ~torch.isin(src * n + dst, excluded)
-                context = dgl.edge_subgraph(context, keep.nonzero().reshape(-1),
-                                           relabel_nodes=False)
-            full_ids = torch.arange(context.num_nodes(), device=ids.device)
-            if self.training and torch.is_grad_enabled():
-                full_x = torch.cat([
-                    checkpoint(self.rgcn.encode_input, part, use_reentrant=False)
-                    for part in full_ids.split(1024)
-                ], dim=0)
-            else:
-                full_x = self.rgcn.encode_input(full_ids)
-            x = full_x[ids]
-        else:
-            context = graph
-            x = self.rgcn.encode_input(ids)
-            full_x = x
+        Encode the visible graph with shared inputs for RGCN and feature PPR.
+        Legacy auxiliary-graph arguments are accepted but unused for mask safety.
+        """
+        # Encode inputs once: both branches see the same dropout realization.
+        x = self.rgcn.encode_input(node_ids)
         h_rgcn = x
         for layer in self.rgcn.layers[1:]:
             h_rgcn = layer(graph, h_rgcn, rel_ids, norm)
         if not self.use_ppr:
             return h_rgcn
-        diffused = self.ppr_branch.diffuse(context, full_x)
-        if context_graph is not None:
-            diffused = diffused[ids]
-        h_ppr = self.ppr_branch.project(diffused)
-        return self.ppr_fusion(h_rgcn, h_ppr)
+        # Legacy global-PPR arguments remain accepted, but are deliberately not
+        # consumed: those edges may include masked targets and multi-hop leakage.
+        h_ppr = self.ppr_branch(graph, x)
+        fused = self.ppr_fusion(h_rgcn, h_ppr)
+        return fused
 
     def regularization_loss(self, embeddings):
         return torch.mean(embeddings.pow(2)) + torch.mean(self.relation_weights.pow(2))
@@ -1052,17 +995,8 @@ class LinkPredict(nn.Module):
         """
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        checkpoint = torch.load(checkpoint_path, map_location=device)
-        meta = checkpoint.get('meta', {})
-        ssl_meta = meta.get('ssl', {})
-        for key, saved_key in (('ppr_c', 'ppr_c'),
-                               ('ppr_iterations', 'ppr_iterations'),
-                               ('ppr_num_layers', 'ppr_num_layers')):
-            if saved_key in ssl_meta:
-                init_kwargs.setdefault(key, ssl_meta[saved_key])
-        if meta.get('use_ppr') is not None:
-            init_kwargs.setdefault('use_ppr', meta['use_ppr'])
         model = cls(**init_kwargs)
+        checkpoint = torch.load(checkpoint_path, map_location=device)
         try:
             model.load_state_dict(checkpoint["state_dict"])
         except RuntimeError as exc:

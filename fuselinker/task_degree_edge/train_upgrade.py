@@ -27,7 +27,6 @@ from model_base4 import (
     LinkPredict,
     EdgeTypeClassifier,
     DegreeClassifier,
-    compute_ppr_sparse,
 )
 from data_loader import Data
 from ssl_eval import (
@@ -44,10 +43,12 @@ from ssl_eval import (
     evaluate_ssl_edge,
     final_ckpt_path,
     format_ssl_log,
+    seed_everything,
 )
 
 
 def main(args):
+    seed_everything(args.seed)
     args.data = resolve_data_dir(args.data)
     args.ssl_model_state_file = ensure_parent(resolve_path(args.ssl_model_state_file))
     print(f"Data: {args.data}")
@@ -121,7 +122,6 @@ def main(args):
     eval_neg_rate = (
         args.negative_sample if args.eval_neg_rate is None else args.eval_neg_rate
     )
-    eval_rng = np.random.RandomState(42)
 
     model = LinkPredict(num_nodes,
                         args.n_hidden,
@@ -136,7 +136,9 @@ def main(args):
                         freeze=freeze,
                         w=args.w,
                         use_ppr=args.use_ppr,
-                        ppr_num_layers=args.ppr_num_layers)
+                        ppr_num_layers=args.ppr_num_layers,
+                        ppr_c=args.ppr_c,
+                        ppr_iterations=args.ppr_iter_num)
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -179,6 +181,14 @@ def main(args):
         args.num_degree_bins / deg_class_weights.sum()
     )
     deg_class_weights = deg_class_weights.to(device)
+    if args.degree_prior_correction:
+        if args.degree_on_full or args.edge_sampler == 'uniform':
+            degree_head.configure_sampling_prior(
+                train_deg, degree_label_full, deg_class_weights,
+                args.graph_batch_size, len(train_data_np), args.degree_on_full,
+            )
+        else:
+            print('Degree prior correction disabled: requires uniform edge sampling.')
     print(
         f"Degree class weights: min={deg_class_weights.min():.3f}, "
         f"max={deg_class_weights.max():.3f}, degree_on_full={args.degree_on_full}"
@@ -187,26 +197,12 @@ def main(args):
     # ========================================================
     # Generating Auxiliary Network (PPR) - theo HGDC
     # ========================================================
+    # Keep the base train adjacency, not a precomputed diffusion graph. The
+    # encoder removes masked pairs (both directions) before each PPR operation.
+    ppr_graph = ppr_edge_weight = all_node_ids = None
+    context_graph = train_graph.to(device) if args.use_ppr else None
     if args.use_ppr:
-        print(f"Building auxiliary PPR network on {device}...")
-        ppr_graph, ppr_edge_weight = compute_ppr_sparse(
-            num_nodes, train_data_np,
-            c=args.ppr_c, epsilon=args.ppr_eps,
-            use_iterative=args.ppr_iterative,
-            num_iter=args.ppr_iter_num,
-            device=device,
-            batch_size=args.ppr_batch_size,
-        )
-        ppr_graph = ppr_graph.to(device)
-        ppr_edge_weight = ppr_edge_weight.to(device)
-        all_node_ids = torch.arange(num_nodes, dtype=torch.long).view(-1, 1).to(device)
-        print(f"Gppr: {ppr_graph.number_of_nodes()} nodes, "
-              f"{ppr_graph.number_of_edges()} edges "
-              f"(c={args.ppr_c}, epsilon={args.ppr_eps}).")
-    else:
-        ppr_graph = None
-        ppr_edge_weight = None
-        all_node_ids = None
+        print(f"Mask-safe feature PPR: c={args.ppr_c}, iterations={args.ppr_iter_num}")
 
     # Cân bằng 2 task: học trọng số (uncertainty) hoặc lambda tĩnh.
     if args.learn_loss_weights:
@@ -277,7 +273,9 @@ def main(args):
         embed = model(g, node_id, edge_type, edge_norm,
                       ppr_graph=ppr_graph,
                       ppr_edge_weight=ppr_edge_weight,
-                      all_node_ids=all_node_ids)
+                      all_node_ids=all_node_ids,
+                      context_graph=context_graph,
+                      masked_pairs=node_id.reshape(-1)[data[edge_labels < num_rels][:, [0, 2]]])
 
         # ---- edge-type loss (chỉ trên mask + negative) ----
         edge_logits = edge_head(embed[data[:, 0]], embed[data[:, 2]])  # [N, num_rels+1]
@@ -296,6 +294,8 @@ def main(args):
                 ppr_graph=ppr_graph,
                 ppr_edge_weight=ppr_edge_weight,
                 all_node_ids=all_node_ids,
+                context_graph=context_graph,
+                masked_pairs=torch.empty((0, 2), dtype=torch.long, device=device),
             )
             deg_labels = degree_label_full
         else:
@@ -342,11 +342,12 @@ def main(args):
                 ppr_graph=ppr_graph,
                 ppr_edge_weight=ppr_edge_weight,
                 all_node_ids=all_node_ids,
+                context_graph=context_graph,
             )
             edge_metrics = evaluate_ssl_edge(
                 full_embed, edge_head, valid_data_np, num_rels, eval_neg_rate,
                 total_data_np, device,
-                max_triples=args.eval_max_triples, rng=eval_rng,
+                max_triples=args.eval_max_triples, rng=np.random.RandomState(42),
             )
 
             if edge_metrics["loss"] < best_valid_loss_edge:
@@ -384,11 +385,12 @@ def main(args):
         ppr_graph=ppr_graph,
         ppr_edge_weight=ppr_edge_weight,
         all_node_ids=all_node_ids,
+        context_graph=context_graph,
     )
     test_edge = evaluate_ssl_edge(
         full_embed, edge_head, test_data_np, num_rels, eval_neg_rate,
         total_data_np, device,
-        max_triples=args.eval_max_triples, rng=eval_rng,
+        max_triples=args.eval_max_triples, rng=np.random.RandomState(43),
     )
     test_deg = evaluate_ssl_degree(full_embed, degree_head, degree_label_full)
     if loss_weighter is not None:
@@ -593,7 +595,7 @@ if __name__ == "__main__":
         "--degree_on_full",
         dest="degree_on_full",
         type=lambda x: str(x).lower() in ("1", "true", "yes"),
-        default=True,
+        default=False,
         help="Train task degree tren TOAN BO do thi train (phu deu moi node, "
              "PPR nhat quan luc train==TEST). Tat (False) neu can tiet kiem "
              "thoi gian/VRAM hoac muon giong LukePi subgraph.",
@@ -634,12 +636,12 @@ if __name__ == "__main__":
         help="Enable auxiliary PPR network branch (HGDC-style).",
     )
     parser.add_argument(
-        "--ppr_c", dest="ppr_c", type=float, default=0.15,
+        "--ppr_c", dest="ppr_c", type=float, default=0.85,
         help="Damping factor c in PPR (teleport prob = 1 - c).",
     )
     parser.add_argument(
         "--ppr_eps", dest="ppr_eps", type=float, default=1e-4,
-        help="Truncation threshold epsilon for sparsifying S.",
+        help="Legacy option; unused by feature-space PPR.",
     )
     parser.add_argument(
         "--ppr_num_layers", dest="ppr_num_layers", type=int, default=2,
@@ -649,17 +651,21 @@ if __name__ == "__main__":
         "--ppr_iterative", dest="ppr_iterative",
         type=lambda x: str(x).lower() in ("1", "true", "yes"),
         default=True,
-        help="Use iterative PPR on GPU (saves RAM) instead of dense matrix inverse.",
+        help="Legacy option; feature-space PPR always uses finite iteration.",
     )
     parser.add_argument(
-        "--ppr_iter_num", dest="ppr_iter_num", type=int, default=50,
-        help="Number of iterations if --ppr_iterative True.",
+        "--ppr_iter_num", dest="ppr_iter_num", type=int, default=8,
+        help="Feature-space PPR iterations on the visible graph.",
     )
     parser.add_argument(
         "--ppr_batch_size", dest="ppr_batch_size", type=int, default=None,
-        help="So walker / batch khi tinh PPR tren GPU. Mac dinh: tu chon theo VRAM.",
+        help="Legacy option; feature-space PPR does not batch walkers.",
     )
 
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--degree_prior_correction', default=True,
+                        type=lambda x: str(x).lower() in ('1', 'true', 'yes'),
+                        help='Correct degree-class prior using training graph sampling probabilities.')
     args = parser.parse_args()
 
     main(args)

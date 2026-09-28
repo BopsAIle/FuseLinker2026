@@ -1,0 +1,62 @@
+{
+  "config": {
+    "model": "experiments\\degree_edge\\global_model_base4.py",
+    "data": "suppkg",
+    "seed": 42,
+    "iterations": 1,
+    "evaluate_every": 1,
+    "ppr": true,
+    "test": false,
+    "checkpoint": null,
+    "output": "experiments\\degree_edge\\global_smoke.json"
+  },
+  "model_sha256": "27fc1de28d7dcbc78e81410b227f9f02399d87341d82e532b33f8e3da2d7150a",
+  "num_nodes": 43474,
+  "num_relations": 15,
+  "protocol": "subgraph degree; fixed validation; best validation edge CE",
+  "degree_prior_correction": true,
+  "history": [
+    {
+      "step": 1,
+      "train_edge_loss": 2.784031391143799,
+      "train_degree_loss": 1.1134313344955444,
+      "edge": {
+        "loss": 2.049213409423828,
+        "auc": 0.4765367928398499,
+        "aupr": 0.06523944366104054,
+        "f1": 0.041666666666666664,
+        "bacc": 0.0625,
+        "num_pos": 5000,
+        "num_neg": 5000
+      },
+      "degree": {
+        "loss": 1.9482357501983643,
+        "auc": 0.5175718273815624,
+        "aupr": 0.14322415477551806,
+        "f1": 0.04767768574581307,
+        "bacc": 0.15108544896096388
+      }
+    }
+  ],
+  "best_step": 1,
+  "validation": {
+    "edge": {
+      "loss": 2.049213409423828,
+      "auc": 0.4765367928398499,
+      "aupr": 0.06523944366104054,
+      "f1": 0.041666666666666664,
+      "bacc": 0.0625,
+      "num_pos": 5000,
+      "num_neg": 5000
+    },
+    "degree": {
+      "loss": 1.9482357501983643,
+      "auc": 0.5175718273815624,
+      "aupr": 0.14322415477551806,
+      "f1": 0.04767768574581307,
+      "bacc": 0.15108544896096388
+    }
+  },
+  "seconds": 761.9689999999973,
+  "peak_gpu_mb": 5336.75146484375
+}
