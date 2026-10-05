@@ -1,0 +1,15 @@
+# model_base_test
+
+Script: `train_compare_model_base_test.py`
+
+## Runs
+
+- seed 42: MR 2.845632 | MRR 0.729602 | Hits@1 0.612798 | Hits@3 0.811824 | Hits@10 0.951502 | AUROC 0.971010
+- seed 43: MR 2.929769 | MRR 0.724981 | Hits@1 0.608533 | Hits@3 0.804291 | Hits@10 0.947956 | AUROC 0.969414
+- seed 44: MR 2.986470 | MRR 0.718249 | Hits@1 0.601458 | Hits@3 0.796987 | Hits@10 0.945047 | AUROC 0.970382
+- seed 45: MR 2.894653 | MRR 0.727386 | Hits@1 0.610951 | Hits@3 0.808294 | Hits@10 0.948479 | AUROC 0.969832
+- seed 46: MR 2.988970 | MRR 0.715410 | Hits@1 0.595510 | Hits@3 0.796823 | Hits@10 0.945962 | AUROC 0.968111
+
+## Mean
+
+MR 2.929099 | MRR 0.723126 | Hits@1 0.605850 | Hits@3 0.803644 | Hits@10 0.947789 | AUROC 0.969750

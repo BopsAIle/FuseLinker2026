@@ -1,8 +1,16 @@
+import sys
+from pathlib import Path
+
 import dgl
 from dgl.nn.pytorch import RelGraphConv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+_COMPARE_DIR = Path(__file__).resolve().parent
+if str(_COMPARE_DIR) not in sys.path:
+    sys.path.insert(0, str(_COMPARE_DIR))
+from fusion_v1_v10 import build_fusion  # noqa: E402
 
 
 # reduce dimensions by Autoencoder
@@ -41,7 +49,7 @@ class BaseRGCN(nn.Module):
 
     def __init__(self, num_nodes, hidden_dim, output_dim, num_relations, num_bases=-1,
                 num_hidden_layers=1, dropout=0.0, use_self_loop=False, use_cuda=False, pretrained_text_embeddings=None,
-                pretrained_domain_embeddings=None, freeze=False, w=0.5):
+                pretrained_domain_embeddings=None, freeze=False, w=0.5, fusion_variant=None):
         super(BaseRGCN, self).__init__()
         self.num_nodes = num_nodes
         self.hidden_dim = hidden_dim
@@ -56,6 +64,7 @@ class BaseRGCN(nn.Module):
         self.pretrained_domain_embeddings = pretrained_domain_embeddings
         self.freeze = freeze
         self.w = w
+        self.fusion_variant = fusion_variant
 
         # Create RGCN layers
         self.build_model()
@@ -102,9 +111,12 @@ class EmbeddingLayer(nn.Module):
     one of which will be linearly transformed to match dimensions, and each is normalized before weighted averaging.
     """
 
-    def __init__(self, num_nodes, hidden_dim, pretrained_text_embeddings, pretrained_domain_embeddings, freeze=False,w=0.5):
+    def __init__(self, num_nodes, hidden_dim, pretrained_text_embeddings, pretrained_domain_embeddings, freeze=False,w=0.5, fusion_variant=None):
         super(EmbeddingLayer, self).__init__()
         self.w = w
+        self.fusion_variant = fusion_variant
+        if fusion_variant:
+            self.fusion = build_fusion(fusion_variant, hidden_dim)
         # Pretrained domain embeddings
         if pretrained_domain_embeddings is not None:
             #Kích thước ma trận pretrained_domain_embeddings :(num_nodes, hidden_dim)
@@ -146,9 +158,12 @@ class EmbeddingLayer(nn.Module):
         # Map Poincaré embeddings to Euclidean space
         transformed_domain_embeddings = self.poincare_to_euclidean(self.norm_domain_embeddings(node_ids.squeeze()))
 
-        # Weighted average of the two normalized embeddings
-        # Assuming equal weight for simplicity; adjust as needed
-        combined_embedding = (1 - self.w) * transformed_domain_embeddings + self.w * transformed_text_embeddings
+        if self.fusion_variant:
+            combined_embedding = self.fusion(
+                transformed_text_embeddings, transformed_domain_embeddings
+            )
+        else:
+            combined_embedding = (1 - self.w) * transformed_domain_embeddings + self.w * transformed_text_embeddings
 
         return combined_embedding
 
@@ -161,7 +176,8 @@ class RGCN(BaseRGCN):
     def build_input_layer(self):
         # Initialize node features with embedding layer
         return EmbeddingLayer(self.num_nodes, self.hidden_dim, self.pretrained_text_embeddings,
-                            self.pretrained_domain_embeddings, self.freeze, self.w)
+                            self.pretrained_domain_embeddings, self.freeze, self.w,
+                            fusion_variant=self.fusion_variant)
 
     def build_hidden_layer(self, idx):
         # Activation function for all but the last layer
@@ -184,13 +200,15 @@ class LinkPredict(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_relations, num_bases=-1,
                 num_hidden_layers=1, dropout=0.0, use_cuda=False, regularization_param=0.0,
                 pretrained_text_embeddings=None, pretrained_domain_embeddings=None,
-                pretrained_relation_embeddings=None, freeze=False, w=0.5):
+                pretrained_relation_embeddings=None, freeze=False, w=0.5,
+                fusion_variant=None):
         super(LinkPredict, self).__init__()
         #Tạo backbone RGCN để sinh embedding cho các node với 2 nguồn thông tin:text_embedding và domain_knowledge_embedding
         #Do dùng cả cạnh thuận và cạnh nghịch nên số quan hệ trong graph conv được x2 : num_relations *2
         self.rgcn = RGCN(input_dim, hidden_dim, hidden_dim, num_relations * 2, num_bases,
                         num_hidden_layers, dropout, use_cuda, pretrained_text_embeddings=pretrained_text_embeddings,
-                        pretrained_domain_embeddings=pretrained_domain_embeddings, freeze=freeze,w=w)
+                        pretrained_domain_embeddings=pretrained_domain_embeddings, freeze=freeze,w=w,
+                        fusion_variant=fusion_variant)
         #Hệ số để cộng vòa regularization loss
         self.regularization_param = regularization_param
         # nếu có pretrained_relation_embeddings thì chuyển thành tham số để train tiếp

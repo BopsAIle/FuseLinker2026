@@ -1,3 +1,4 @@
+###Đây là model mà mới 29/9 mình sửa lại và có 1 số cờ bật tắt để so sánh 
 """
 Semantic multi-source R-GCN for biomedical knowledge-graph node embeddings.
 
@@ -471,9 +472,12 @@ class EmbeddingLayer(nn.Module):
         w=None,
         dropout=0.0,
         domain_is_poincare=False,
+        use_projector=True,
+        use_adaptive_fusion=True,
     ):
         super().__init__()
-        self.w = w  # compatibility only; FusionGate ignores it.
+        self.w = w
+        self.use_adaptive_fusion = use_adaptive_fusion
         self.hidden_dim = hidden_dim
         self.last_alignment_loss = None
 
@@ -498,10 +502,13 @@ class EmbeddingLayer(nn.Module):
         self.domain_logmap = (
             PoincareLogMap0() if domain_is_poincare else nn.Identity()
         )
-        self.domain_projector = MLPProjector(
-            domain_input_dim,
-            hidden_dim,
-        )
+        if use_projector:
+            self.domain_projector = MLPProjector(
+                domain_input_dim,
+                hidden_dim,
+            )
+        else:
+            self.domain_projector = nn.Linear(domain_input_dim, hidden_dim)
 
         # Text/name view ------------------------------------------------------
         if pretrained_text_embeddings is not None:
@@ -529,7 +536,8 @@ class EmbeddingLayer(nn.Module):
             hidden_dim,
         )
 
-        self.fusion_gate = FusionGate(hidden_dim)
+        if use_adaptive_fusion:
+            self.fusion_gate = FusionGate(hidden_dim)
 
     @staticmethod
     def _semantic_alignment_loss(text_x, domain_x):
@@ -556,8 +564,10 @@ class EmbeddingLayer(nn.Module):
             domain_x,
         )
 
-        # No fixed 0.5 and no w-prior: gate is learned entirely from data.
-        return self.fusion_gate(text_x, domain_x)
+        if self.use_adaptive_fusion:
+            return self.fusion_gate(text_x, domain_x)
+        w = 0.5 if self.w is None else float(self.w)
+        return w * text_x + (1.0 - w) * domain_x
 
 
 # ============================================================================
@@ -591,8 +601,10 @@ class LukePiRelGraphConvBlock(nn.Module):
         dropout=0.0,
         use_self_loop=True,
         activation=None,
+        use_residual_alpha=True,
     ):
         super().__init__()
+        self.use_residual_alpha = use_residual_alpha
 
         self.conv = RelGraphConv(
             in_feat=hidden_dim,
@@ -607,16 +619,23 @@ class LukePiRelGraphConvBlock(nn.Module):
 
         # One learnable scalar per R-GCN layer.  Zero logit means a neutral
         # starting point; it is NOT a fixed 0.5 weighted average.
-        self.alpha_logit = nn.Parameter(torch.zeros(1))
+        if use_residual_alpha:
+            self.alpha_logit = nn.Parameter(torch.zeros(1))
+        else:
+            self.register_parameter("alpha_logit", None)
 
     def forward(self, graph, x, rel_ids, norm):
         h_new = self.conv(graph, x, rel_ids, norm)
+        if not self.use_residual_alpha:
+            return h_new
         alpha = torch.sigmoid(self.alpha_logit)
         return alpha * h_new + (1.0 - alpha) * x
 
     @property
     def alpha(self):
         """Current learned residual weight in [0, 1], useful for logging."""
+        if self.alpha_logit is None:
+            return None
         return torch.sigmoid(self.alpha_logit)
 
 
@@ -649,6 +668,9 @@ class BaseRGCN(nn.Module):
         freeze=False,
         w=None,
         domain_is_poincare=False,
+        use_projector=True,
+        use_adaptive_fusion=True,
+        use_residual_alpha=True,
     ):
         super().__init__()
         self.num_nodes = num_nodes
@@ -665,6 +687,9 @@ class BaseRGCN(nn.Module):
         self.freeze = freeze
         self.w = w
         self.domain_is_poincare = domain_is_poincare
+        self.use_projector = use_projector
+        self.use_adaptive_fusion = use_adaptive_fusion
+        self.use_residual_alpha = use_residual_alpha
 
         self.build_model()
 
@@ -716,6 +741,8 @@ class RGCN(BaseRGCN):
             w=self.w,
             dropout=self.dropout,
             domain_is_poincare=self.domain_is_poincare,
+            use_projector=self.use_projector,
+            use_adaptive_fusion=self.use_adaptive_fusion,
         )
 
     def build_hidden_layer(self, idx):
@@ -728,6 +755,7 @@ class RGCN(BaseRGCN):
             dropout=self.dropout,
             use_self_loop=self.use_self_loop,
             activation=activation,
+            use_residual_alpha=self.use_residual_alpha,
         )
 
     def encode_input(self, node_ids):
@@ -846,6 +874,9 @@ class LinkPredict(nn.Module):
         domain_is_poincare=False,
         ppr_prior=0.10,
         semantic_alignment_weight=0.01,
+        use_projector=True,
+        use_adaptive_fusion=True,
+        use_residual_alpha=True,
     ):
         super().__init__()
 
@@ -864,6 +895,9 @@ class LinkPredict(nn.Module):
             freeze=freeze,
             w=w,
             domain_is_poincare=domain_is_poincare,
+            use_projector=use_projector,
+            use_adaptive_fusion=use_adaptive_fusion,
+            use_residual_alpha=use_residual_alpha,
         )
 
         self.use_ppr = use_ppr

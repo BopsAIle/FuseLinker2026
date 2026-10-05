@@ -1,52 +1,123 @@
-cd D:\FuseLinker\FuseLinker\fuselinker
+python compare_submodules/train_compare_model.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy
 
-python task_degree_edge/train_base.py `
-  --data suppkg `
-  --text_embedding_file bert_pretrained_embeddings_768.npy `
-  --knowledge_embedding_file poincare_embeddings.npy `
-  --num_hidden_layers 2 `
-  --iterations 40000 `
-  --evaluate_every 1000 `
-  --graph_batch_size 1024 `
-  --mask_rate 0.2 `
-  --negative_sample 20 `
-  --num_degree_bins 10 `
-  --degree_bin_strategy quantile `
-  --w 0.75 `
-  --ssl_model_state_file checkpoints/hetionet/pubmedbert/ssl_base/ssl_model_state.pth
+Cờ tắt các module trong model
++Sematic projector :               --use_projector false
+python compare_submodules/train_compare_modelv4.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy \
+  --use_projector false
+
++Adapter text/domain fusion        --use_adaptive_fusion false
+python compare_submodules/train_compare_modelv4.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy \
+  --use_adaptive_fusion false
+
+
++Sematic alignment loss            --semantic_alignment_weight 0
+python compare_submodules/train_compare_modelv4.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy \
+  --semantic_alignment_weight 0
+
++Residual alpha trong R-GCN        --use_residual_alpha false
+python compare_submodules/train_compare_modelv4.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy \
+  --use_residual_alpha false
+
++CUDA PPR top-50                   --use_ppr false
+python compare_submodules/train_compare_modelv4.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy \
+  --use_ppr false
 
 
 
-cd D:\FuseLinker2026\fuselinker
-python task_node_mask/train_base.py `
-  --data suppkg `
-  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy `
-  --knowledge_embedding_file poincare_embeddings.npy `
-  --num_hidden_layers 2 `
-  --iterations 40000 `
-  --evaluate_every 1000 `
-  --negative_sample 20 `
-  --neg_sample_size_eval 100 `
-  --w 0.75 `
-  --model_state_file checkpoints/hetionet/pubmedbert/model/model_state.pth
+Đây là đoạn model được gắn thêm các module  
+train_compare_model_base_test
 
-Hiện tại mình muốn so sánh model_base4.py và model.py để so sánh các module nào sẽ có lợi cho 
-việc train. 
-cd D:\FuseLinker2026\fuselinker
-python task_degree_edge/train_base.py `
-  --data suppkg `
-  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy `
-  --knowledge_embedding_file poincare_embeddings.npy `
-  --num_hidden_layers 2 `
-  --iterations 50 `
-  --evaluate_every 1 `
-  --graph_batch_size 1024 `
-  --mask_rate 0.2 `
-  --negative_sample 1 `
-  --num_degree_bins 10 `
-  --degree_bin_strategy quantile `
-  --degree_on_full false `
-  --w 0.75 `
-  --ssl_model_state_file checkpoints/hetionet/pubmedbert/ssl_base/ssl_model_state.pth
++++    --use_projector true
+  python compare_submodules/train_compare_model_base_test.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file bert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy \
+  --use_projector true
 
-train_base
+++     --use_adaptive_fusion true
+python compare_submodules/train_compare_model_base_test.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file bert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy \
+  --use_adaptive_fusion true
+
+
+++         --use_node_id true
+python compare_submodules/train_compare_model_base_test.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file bert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy \
+  --use_node_id true
+
+++         --use_residual_rgcn true
+python compare_submodules/train_compare_model_base_test.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file bert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy \
+  --use_residual_rgcn true
+
+++           --use_jumping_knowledge true
+  python compare_submodules/train_compare_model_base_test.py \
+    --data suppkg --seed 42 --iterations 40000 \
+    --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+    --text_embedding_file bert_pretrained_embeddings_768.npy \
+    --knowledge_embedding_file poincare_embeddings.npy \
+    --use_jumping_knowledge true
+
+++             --use_ppr true
+python compare_submodules/train_compare_model_base_test.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file bert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy \
+  --use_ppr true
+
+
+
+Bản chứa toàn bộ cờ 
+python compare_submodules/train_compare_model_base_test.py \
+  --data suppkg --seed 42 --iterations 40000 \
+  --evaluate_every 1000 --num_hidden_layers 2 --w 0.75 \
+  --text_embedding_file pubmedbert_pretrained_embeddings_768.npy \
+  --knowledge_embedding_file poincare_embeddings.npy\
+  --use_projector true\
+  --use_adaptive_fusion true\
+  --use_node_id true\
+  --use_residual_rgcn true\
+  --use_jumping_knowledge true\
+  --use_ppr true
+
+
+
+  
+
+
+

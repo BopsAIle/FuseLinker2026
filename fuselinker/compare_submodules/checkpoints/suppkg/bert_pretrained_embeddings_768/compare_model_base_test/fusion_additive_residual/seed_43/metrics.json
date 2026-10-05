@@ -1,0 +1,26 @@
+{
+  "encoder": "model_base_test",
+  "config": "fusion_additive_residual",
+  "seed": 43,
+  "use_projector": false,
+  "use_adaptive_fusion": true,
+  "fusion_variant": "additive_residual",
+  "use_node_id": false,
+  "use_residual_rgcn": false,
+  "use_jumping_knowledge": false,
+  "use_ppr": false,
+  "ppr_num_layers": 2,
+  "ppr_c": 0.15,
+  "ppr_eps": 0.0001,
+  "ppr_num_iter": 50,
+  "ppr_topk": 50,
+  "ppr_batch_size": 128,
+  "mr": 2.9086570739746094,
+  "mrr": 0.7255497574806213,
+  "hits": {
+    "1": 0.6104774475097656,
+    "3": 0.803817093372345,
+    "10": 0.9481192231178284
+  },
+  "auroc": 0.9643305849966586
+}

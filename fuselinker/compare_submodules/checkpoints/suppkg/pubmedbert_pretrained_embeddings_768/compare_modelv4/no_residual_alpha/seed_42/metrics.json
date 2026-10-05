@@ -1,0 +1,19 @@
+{
+  "encoder": "modelv4",
+  "config": "no_residual_alpha",
+  "seed": 42,
+  "use_projector": true,
+  "use_adaptive_fusion": true,
+  "semantic_alignment_weight": 0.01,
+  "use_residual_alpha": false,
+  "use_ppr": true,
+  "domain_is_poincare": true,
+  "mr": 2.6726527214050293,
+  "mrr": 0.8287013173103333,
+  "hits": {
+    "1": 0.758439838886261,
+    "3": 0.8796202540397644,
+    "10": 0.9530866742134094
+  },
+  "auroc": 0.9834766166703657
+}

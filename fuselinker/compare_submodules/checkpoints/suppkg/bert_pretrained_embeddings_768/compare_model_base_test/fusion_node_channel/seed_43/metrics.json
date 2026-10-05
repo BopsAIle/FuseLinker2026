@@ -1,0 +1,26 @@
+{
+  "encoder": "model_base_test",
+  "config": "fusion_node_channel",
+  "seed": 43,
+  "use_projector": false,
+  "use_adaptive_fusion": true,
+  "fusion_variant": "node_channel",
+  "use_node_id": false,
+  "use_residual_rgcn": false,
+  "use_jumping_knowledge": false,
+  "use_ppr": false,
+  "ppr_num_layers": 2,
+  "ppr_c": 0.15,
+  "ppr_eps": 0.0001,
+  "ppr_num_iter": 50,
+  "ppr_topk": 50,
+  "ppr_batch_size": 128,
+  "mr": 3.363966226577759,
+  "mrr": 0.6928418874740601,
+  "hits": {
+    "1": 0.5728618502616882,
+    "3": 0.7691591382026672,
+    "10": 0.9306023120880127
+  },
+  "auroc": 0.967497859158318
+}

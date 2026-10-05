@@ -1,0 +1,24 @@
+{
+  "encoder": "model_base_test",
+  "config": "node_id",
+  "seed": 42,
+  "use_projector": false,
+  "use_adaptive_fusion": false,
+  "use_node_id": true,
+  "use_residual_rgcn": false,
+  "use_jumping_knowledge": false,
+  "use_ppr": false,
+  "ppr_num_layers": 2,
+  "ppr_c": 0.15,
+  "ppr_eps": 0.0001,
+  "ppr_num_iter": 50,
+  "ppr_topk": 50,
+  "mr": 2.902496814727783,
+  "mrr": 0.732865571975708,
+  "hits": {
+    "1": 0.620820939540863,
+    "3": 0.8093075156211853,
+    "10": 0.9470080733299255
+  },
+  "auroc": 0.9651844091168499
+}
