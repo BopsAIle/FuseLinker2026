@@ -5,6 +5,7 @@ Same sampling, loss, and test protocol as task_node_mask/train_base.py.
 Checkpoints stay under compare_submodules/checkpoints/.
 """
 import argparse
+import hashlib
 import importlib.util
 import json
 import pickle
@@ -20,6 +21,7 @@ CHECKPOINTS_DIR = HERE / "checkpoints"
 sys.path.insert(0, str(ROOT / "task_node_mask"))
 import task_setup  # noqa: F401,E402
 
+import dgl
 import numpy as np
 import pandas as pd
 import torch
@@ -30,14 +32,14 @@ from data_loader import Data
 from paths import ensure_parent, resolve_data_dir
 
 
-def _load_link_predict():
+def _load_model_module():
     path = HERE / "model.py"
     spec = importlib.util.spec_from_file_location(
         "compare_submodules_model", path
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.LinkPredict
+    return module
 
 
 def _str2bool(value):
@@ -74,17 +76,84 @@ def _embedding_name(text_embedding_file):
     return Path(text_embedding_file).stem
 
 
-def _default_checkpoint(data_dir, text_embedding_file, seed, fusion_variant=None):
+def _default_checkpoint(
+    data_dir, text_embedding_file, seed, fusion_variant=None,
+    use_domain_mlp_projector=False, use_residual_rgcn=False, use_ppr=False,
+):
     parts = [
         CHECKPOINTS_DIR,
         _dataset_name(data_dir),
         _embedding_name(text_embedding_file),
         "compare_model",
     ]
+    if use_domain_mlp_projector:
+        parts.append("domain_mlp_projector")
+    if use_residual_rgcn:
+        parts.append("residual_rgcn")
+    if use_ppr:
+        parts.append("ppr")
     if fusion_variant:
         parts.append(fusion_variant)
     parts.extend([f"seed_{seed}", "model_state.pth"])
     return Path(*parts)
+
+
+def _ppr_cache_path(data_dir, train_data_np, args):
+    digest = hashlib.md5(np.ascontiguousarray(train_data_np).tobytes()).hexdigest()[:12]
+    name = (
+        f"topk{args.ppr_topk}_c{args.ppr_c}_iter{args.ppr_num_iter}"
+        f"_eps{args.ppr_eps}_batch{args.ppr_batch_size}_{digest}.pt"
+    )
+    return CHECKPOINTS_DIR / _dataset_name(data_dir) / "ppr_cache" / name
+
+
+def _load_or_build_ppr(model_module, args, num_nodes, train_data_np, device):
+    cache_path = _ppr_cache_path(args.data, train_data_np, args)
+    if cache_path.is_file():
+        payload = torch.load(cache_path, map_location="cpu")
+        print(f"Loaded PPR cache: {cache_path}")
+        graph = dgl.graph(
+            (payload["src"], payload["dst"]),
+            num_nodes=int(payload["num_nodes"]),
+        )
+        return graph, payload["weight"]
+
+    print(
+        f"Building CUDA PPR top-{args.ppr_topk} on {device} "
+        f"(c={args.ppr_c}, epsilon={args.ppr_eps}, "
+        f"num_iter={args.ppr_num_iter}, batch_size={args.ppr_batch_size})..."
+    )
+    graph, weight = model_module.compute_ppr_sparse(
+        num_nodes,
+        train_data_np,
+        c=args.ppr_c,
+        epsilon=args.ppr_eps,
+        num_iter=args.ppr_num_iter,
+        topk=args.ppr_topk,
+        device=device,
+        batch_size=args.ppr_batch_size,
+    )
+    print(
+        f"Gppr: {graph.number_of_nodes()} nodes, "
+        f"{graph.number_of_edges()} edges, device={graph.device}."
+    )
+    src, dst = graph.edges()
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            "src": src.detach().cpu(),
+            "dst": dst.detach().cpu(),
+            "weight": weight.detach().cpu(),
+            "num_nodes": int(num_nodes),
+        },
+        cache_path,
+    )
+    print(f"Saved PPR cache: {cache_path}")
+    graph = graph.cpu()
+    weight = weight.cpu()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    return graph, weight
 
 
 def _write_metrics(checkpoint_path, payload):
@@ -101,7 +170,8 @@ def main(args):
         args.model_state_file = str(_under_checkpoints(args.model_state_file))
     else:
         args.model_state_file = str(ensure_parent(str(_default_checkpoint(
-            args.data, args.text_embedding_file, args.seed, args.fusion_variant
+            args.data, args.text_embedding_file, args.seed, args.fusion_variant,
+            args.use_domain_mlp_projector, args.use_residual_rgcn, args.use_ppr,
         ))))
     if args.roc_save_path:
         args.roc_save_path = str(_under_checkpoints(args.roc_save_path))
@@ -114,7 +184,14 @@ def main(args):
     print(f"Checkpoint: {args.model_state_file}")
     print(
         "Hyperparameters | "
-        f"seed={args.seed} fusion={args.fusion_variant or 'fixed'} w={args.w} n_hidden={args.n_hidden} "
+        f"seed={args.seed} fusion={args.fusion_variant or 'fixed'} "
+        f"domain_mlp_projector={args.use_domain_mlp_projector} "
+        f"residual_rgcn={args.use_residual_rgcn} "
+        f"ppr={args.use_ppr} ppr_num_layers={args.ppr_num_layers} "
+        f"ppr_c={args.ppr_c} ppr_eps={args.ppr_eps} "
+        f"ppr_num_iter={args.ppr_num_iter} ppr_topk={args.ppr_topk} "
+        f"ppr_batch_size={args.ppr_batch_size} "
+        f"w={args.w} n_hidden={args.n_hidden} "
         f"num_hidden_layers={args.num_hidden_layers} num_bases={args.num_bases} "
         f"dropout={args.dropout} lr={args.lr} reg_param={args.reg_param} "
         f"iterations={args.iterations} graph_batch_size={args.graph_batch_size} "
@@ -169,9 +246,27 @@ def main(args):
     test_data_np = knowledge_graph.test_data
     total_data_np = knowledge_graph.total_data
 
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+
+    model_module = _load_model_module()
+    ppr_graph = None
+    ppr_edge_weight = None
+    all_node_ids = None
+    if args.use_ppr:
+        if device.type != "cuda":
+            raise RuntimeError("PPR is built on CUDA, but CUDA is not available.")
+        ppr_graph, ppr_edge_weight = _load_or_build_ppr(
+            model_module, args, num_nodes, train_data_np, device,
+        )
+        ppr_graph = ppr_graph.to(device)
+        ppr_edge_weight = ppr_edge_weight.to(device)
+        all_node_ids = torch.arange(num_nodes, dtype=torch.long).view(-1, 1).to(device)
+
     _set_seed(args.seed)
-    LinkPredict = _load_link_predict()
-    model = LinkPredict(
+    model = model_module.LinkPredict(
         num_nodes,
         args.n_hidden,
         num_rels,
@@ -185,14 +280,18 @@ def main(args):
         freeze=args.freeze,
         w=args.w,
         fusion_variant=args.fusion_variant,
+        use_domain_mlp_projector=args.use_domain_mlp_projector,
+        use_residual_rgcn=args.use_residual_rgcn,
+        use_ppr=args.use_ppr,
+        ppr_num_layers=args.ppr_num_layers,
     )
 
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-
     model = model.to(device)
+    ppr_kwargs = dict(
+        ppr_graph=ppr_graph,
+        ppr_edge_weight=ppr_edge_weight,
+        all_node_ids=all_node_ids,
+    )
     print(device)
     print("Task 1 DistMult | Encoder: compare_submodules/model.py")
 
@@ -209,53 +308,65 @@ def main(args):
     test_node_id = torch.arange(0, num_nodes, dtype=torch.long).view(-1, 1)
     adj_list = myutils.get_adj(num_nodes, train_data_np)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    print("Start training (masked-entity DistMult)...")
+    eval_only = args.eval_only and Path(args.model_state_file).is_file()
+    if eval_only:
+        checkpoint = torch.load(args.model_state_file, map_location=device)
+        model.load_state_dict(checkpoint["state_dict"])
+        print(f"Loaded checkpoint for eval: {args.model_state_file}")
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print("Start training (masked-entity DistMult)...")
 
-    for iteration in range(1, 1 + args.iterations):
-        model.train()
+    if not eval_only:
+        for iteration in range(1, 1 + args.iterations):
+            model.train()
 
-        g, node_id, edge_type, node_norm, data, labels = \
-            myutils.generate_sampled_graph_and_labels(
-                train_data_np, args.graph_batch_size, args.graph_split_size,
-                num_rels, adj_list, train_deg, args.negative_sample,
-                args.edge_sampler)
+            g, node_id, edge_type, node_norm, data, labels = \
+                myutils.generate_sampled_graph_and_labels(
+                    train_data_np, args.graph_batch_size, args.graph_split_size,
+                    num_rels, adj_list, train_deg, args.negative_sample,
+                    args.edge_sampler)
 
-        node_id = torch.from_numpy(node_id).view(-1, 1).long()
-        edge_type = torch.from_numpy(edge_type)
-        edge_norm = myutils.node_norm_2_edge_norm(
-            g, torch.from_numpy(node_norm).view(-1, 1)
+            node_id = torch.from_numpy(node_id).view(-1, 1).long()
+            edge_type = torch.from_numpy(edge_type)
+            edge_norm = myutils.node_norm_2_edge_norm(
+                g, torch.from_numpy(node_norm).view(-1, 1)
+            )
+            data, labels = torch.from_numpy(data), torch.from_numpy(labels)
+
+            g = g.to(device)
+            node_id = node_id.to(device)
+            edge_type = edge_type.to(device)
+            edge_norm = edge_norm.to(device)
+            data = data.to(device)
+            labels = labels.to(device)
+
+            embed = model(g, node_id, edge_type, edge_norm, **ppr_kwargs)
+            loss = model.get_loss(g, embed, data, labels)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm)
+            optimizer.step()
+
+            if iteration % args.evaluate_every == 0:
+                print("Epoch {} | Loss {:.5f}".format(iteration, loss.item()))
+
+            optimizer.zero_grad()
+
+        torch.save(
+            {"state_dict": model.state_dict(), "iteration": iteration},
+            ensure_parent(args.model_state_file),
         )
-        data, labels = torch.from_numpy(data), torch.from_numpy(labels)
-
-        g = g.to(device)
-        node_id = node_id.to(device)
-        edge_type = edge_type.to(device)
-        edge_norm = edge_norm.to(device)
-        data = data.to(device)
-        labels = labels.to(device)
-
-        embed = model(g, node_id, edge_type, edge_norm)
-        loss = model.get_loss(g, embed, data, labels)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm)
-        optimizer.step()
-
-        if iteration % args.evaluate_every == 0:
-            print("Epoch {} | Loss {:.5f}".format(iteration, loss.item()))
-
-        optimizer.zero_grad()
-
-    torch.save(
-        {"state_dict": model.state_dict(), "iteration": iteration},
-        ensure_parent(args.model_state_file),
-    )
+        del optimizer, g, node_id, edge_type, edge_norm, data, labels, embed, loss
 
     print(
         "Evaluating TEST: encode on test_graph "
         "(FuseLinker original main.py protocol)."
     )
     model.eval()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     test_data = torch.LongTensor(test_data_np)
     total_data = torch.LongTensor(total_data_np)
 
@@ -269,7 +380,7 @@ def main(args):
     total_data = total_data.to(device)
 
     with torch.no_grad():
-        output = model(eval_graph, eval_node_id, eval_rel, eval_norm)
+        output = model(eval_graph, eval_node_id, eval_rel, eval_norm, **ppr_kwargs)
 
     old_time = time.time()
     hits = [1, 3, 10]
@@ -299,6 +410,21 @@ def main(args):
         "encoder": "model",
         "seed": args.seed,
         "fusion_variant": args.fusion_variant or "fixed",
+        "use_domain_mlp_projector": args.use_domain_mlp_projector,
+        "domain_map": (
+            "domain_mlp_projector" if args.use_domain_mlp_projector else "linear"
+        ),
+        "use_residual_rgcn": args.use_residual_rgcn,
+        "rgcn_block": (
+            "residual_rgcn" if args.use_residual_rgcn else "rel_graph_conv"
+        ),
+        "use_ppr": args.use_ppr,
+        "ppr_num_layers": args.ppr_num_layers,
+        "ppr_c": args.ppr_c,
+        "ppr_eps": args.ppr_eps,
+        "ppr_num_iter": args.ppr_num_iter,
+        "ppr_topk": args.ppr_topk,
+        "ppr_batch_size": args.ppr_batch_size,
         "mr": float(mr),
         "mrr": float(mrr),
         "hits": {str(key): float(value) for key, value in hits_dict.items()},
@@ -338,6 +464,34 @@ if __name__ == "__main__":
         "--fusion_variant", dest="fusion_variant", default=None,
         choices=["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"],
         help="Replace fixed w-mix with a fusion class from 10_fusion_variants.md",
+    )
+    parser.add_argument(
+        "--use_domain_mlp_projector", dest="use_domain_mlp_projector",
+        type=_str2bool, default=False,
+        help="Replace the linear domain map with Domain MLP Projector",
+    )
+    parser.add_argument(
+        "--use_residual_rgcn", dest="use_residual_rgcn",
+        type=_str2bool, default=False,
+        help="Replace RelGraphConv hidden layers with Residual R-GCN blocks",
+    )
+    parser.add_argument(
+        "--use_ppr", dest="use_ppr", type=_str2bool, default=False,
+        help="Fuse a Personalized PageRank branch with the R-GCN output",
+    )
+    parser.add_argument(
+        "--ppr_num_layers", dest="ppr_num_layers", type=int, default=2,
+    )
+    parser.add_argument("--ppr_c", dest="ppr_c", type=float, default=0.15)
+    parser.add_argument("--ppr_eps", dest="ppr_eps", type=float, default=1e-4)
+    parser.add_argument("--ppr_num_iter", dest="ppr_num_iter", type=int, default=50)
+    parser.add_argument("--ppr_topk", dest="ppr_topk", type=int, default=50)
+    parser.add_argument(
+        "--ppr_batch_size", dest="ppr_batch_size", type=int, default=128,
+    )
+    parser.add_argument(
+        "--eval_only", dest="eval_only", type=_str2bool, default=False,
+        help="Load an existing checkpoint and run test evaluation",
     )
     parser.add_argument(
         "--n_hidden", dest="n_hidden", type=int, default=200,
