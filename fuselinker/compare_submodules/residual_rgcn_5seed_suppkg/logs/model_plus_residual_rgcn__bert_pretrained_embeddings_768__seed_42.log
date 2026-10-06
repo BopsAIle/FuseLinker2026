@@ -1,0 +1,31 @@
+Data: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/suppkg
+Checkpoint: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_42/model_state.pth
+Hyperparameters | seed=42 fusion=fixed domain_mlp_projector=False residual_rgcn=True w=0.75 n_hidden=200 num_hidden_layers=2 num_bases=20 dropout=0.2 lr=0.001 reg_param=0.01 iterations=40000 graph_batch_size=250 graph_split_size=0.5 negative_sample=20 eval_protocol=filtered
+Loading Pretrained Embeddings files...
+Loaded Text Embeddings file successfully!
+Loaded Domain Knowledge Embeddings file successfully!
+w: 0.75
+Data Processing...
+# entities: 43474
+# relations: 15
+# edges: 305986
+Loaded pretrained domain embeddings, freeze is False.
+Domain map: Linear.
+Loaded pretrained text embeddings, freeze is False.
+Initialized random relation embeddings.
+cuda
+Task 1 DistMult | Encoder: compare_submodules/model.py
+/home/anhlq/Documents/2026-ltt/FuseLinker2026/.venv/lib/python3.10/site-packages/dgl/heterograph.py:92: DGLWarning: Recommend creating graphs by `dgl.graph(data)` instead of `dgl.DGLGraph(data)`.
+  dgl_warning(
+Loaded checkpoint for eval: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_42/model_state.pth
+Evaluating TEST: encode on test_graph (FuseLinker original main.py protocol).
+13.668562412261963
+MR: 2.865649
+MRR: 0.755772
+Hits @ 1 = 0.651116
+Hits @ 3 = 0.829194
+Hits @ 10 = 0.949623
+AUROC: 0.986756
+ROC curve saved: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_42/roc_curve.png
+Metrics saved: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_42/metrics.json
+Training done!
