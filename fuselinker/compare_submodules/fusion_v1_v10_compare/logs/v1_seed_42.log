@@ -1,0 +1,72 @@
+Data: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/suppkg
+Checkpoint: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/v1/seed_42/model_state.pth
+Hyperparameters | seed=42 fusion=v1 w=0.75 n_hidden=200 num_hidden_layers=2 num_bases=20 dropout=0.2 lr=0.001 reg_param=0.01 iterations=40000 graph_batch_size=250 graph_split_size=0.5 negative_sample=20 eval_protocol=filtered
+Loading Pretrained Embeddings files...
+Loaded Text Embeddings file successfully!
+Loaded Domain Knowledge Embeddings file successfully!
+w: 0.75
+Data Processing...
+# entities: 43474
+# relations: 15
+# edges: 305986
+Loaded pretrained domain embeddings, freeze is False.
+Loaded pretrained text embeddings, freeze is False.
+Initialized random relation embeddings.
+cuda
+Task 1 DistMult | Encoder: compare_submodules/model.py
+/home/anhlq/Documents/2026-ltt/FuseLinker2026/.venv/lib/python3.10/site-packages/dgl/heterograph.py:92: DGLWarning: Recommend creating graphs by `dgl.graph(data)` instead of `dgl.DGLGraph(data)`.
+  dgl_warning(
+Start training (masked-entity DistMult)...
+/home/anhlq/Documents/2026-ltt/FuseLinker2026/.venv/lib/python3.10/site-packages/dgl/heterograph.py:92: DGLWarning: Recommend creating graphs by `dgl.graph(data)` instead of `dgl.DGLGraph(data)`.
+  dgl_warning(
+Epoch 1000 | Loss 0.12383
+Epoch 2000 | Loss 0.11619
+Epoch 3000 | Loss 0.10120
+Epoch 4000 | Loss 0.09882
+Epoch 5000 | Loss 0.09933
+Epoch 6000 | Loss 0.09786
+Epoch 7000 | Loss 0.08707
+Epoch 8000 | Loss 0.09346
+Epoch 9000 | Loss 0.09441
+Epoch 10000 | Loss 0.08535
+Epoch 11000 | Loss 0.08741
+Epoch 12000 | Loss 0.09069
+Epoch 13000 | Loss 0.09226
+Epoch 14000 | Loss 0.08480
+Epoch 15000 | Loss 0.08348
+Epoch 16000 | Loss 0.08889
+Epoch 17000 | Loss 0.08641
+Epoch 18000 | Loss 0.07950
+Epoch 19000 | Loss 0.09264
+Epoch 20000 | Loss 0.08351
+Epoch 21000 | Loss 0.08764
+Epoch 22000 | Loss 0.08051
+Epoch 23000 | Loss 0.08329
+Epoch 24000 | Loss 0.07948
+Epoch 25000 | Loss 0.08062
+Epoch 26000 | Loss 0.08422
+Epoch 27000 | Loss 0.07850
+Epoch 28000 | Loss 0.08112
+Epoch 29000 | Loss 0.08022
+Epoch 30000 | Loss 0.07825
+Epoch 31000 | Loss 0.08034
+Epoch 32000 | Loss 0.08072
+Epoch 33000 | Loss 0.07761
+Epoch 34000 | Loss 0.07997
+Epoch 35000 | Loss 0.07544
+Epoch 36000 | Loss 0.08258
+Epoch 37000 | Loss 0.07992
+Epoch 38000 | Loss 0.08031
+Epoch 39000 | Loss 0.08430
+Epoch 40000 | Loss 0.07499
+Evaluating TEST: encode on test_graph (FuseLinker original main.py protocol).
+142.87217140197754
+MR: 3.084643
+MRR: 0.713078
+Hits @ 1 = 0.595787
+Hits @ 3 = 0.790941
+Hits @ 10 = 0.940031
+AUROC: 0.971338
+ROC curve saved: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/v1/seed_42/roc_curve.png
+Metrics saved: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/v1/seed_42/metrics.json
+Training done!
