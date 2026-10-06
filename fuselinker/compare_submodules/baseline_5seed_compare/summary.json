@@ -1,0 +1,160 @@
+{
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "protocol": "suppkg, 40000 iterations, pubmedbert_pretrained_embeddings_768, poincare, w=0.75, num_hidden_layers=2, no extra module flags",
+  "models": {
+    "model": {
+      "script": "train_compare_model.py",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 2.6954638957977295,
+            "mrr": 0.7407070994377136,
+            "hits_1": 0.626670777797699,
+            "hits_3": 0.8207620978355408,
+            "hits_10": 0.9555050730705261,
+            "auroc": 0.9715203314673475
+          },
+          "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/seed_42/metrics.json"
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.0980098247528076,
+            "mrr": 0.7129809856414795,
+            "hits_1": 0.5952808856964111,
+            "hits_3": 0.791725218296051,
+            "hits_10": 0.9406516551971436,
+            "auroc": 0.9678470163927936
+          },
+          "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/seed_43/metrics.json"
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 2.9611425399780273,
+            "mrr": 0.7278421521186829,
+            "hits_1": 0.6149874329566956,
+            "hits_3": 0.8034412860870361,
+            "hits_10": 0.9453413486480713,
+            "auroc": 0.970157371268491
+          },
+          "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/seed_44/metrics.json"
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 2.9981698989868164,
+            "mrr": 0.7184021472930908,
+            "hits_1": 0.5999869108200073,
+            "hits_3": 0.7990620732307434,
+            "hits_10": 0.9443772435188293,
+            "auroc": 0.9728095267527743
+          },
+          "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/seed_45/metrics.json"
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 2.844684362411499,
+            "mrr": 0.7266985177993774,
+            "hits_1": 0.60825514793396,
+            "hits_3": 0.8098466992378235,
+            "hits_10": 0.9521062970161438,
+            "auroc": 0.9696909411080192
+          },
+          "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/seed_46/metrics.json"
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 2.919494104385376,
+        "mrr": 0.7253261804580688,
+        "hits_1": 0.6090362310409546,
+        "hits_3": 0.8049674749374389,
+        "hits_10": 0.9475963234901428,
+        "auroc": 0.970405037397885
+      }
+    },
+    "model_base_test": {
+      "script": "train_compare_model_base_test.py",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 2.845632314682007,
+            "mrr": 0.7296024560928345,
+            "hits_1": 0.6127977967262268,
+            "hits_3": 0.8118239045143127,
+            "hits_10": 0.9515016674995422,
+            "auroc": 0.9710103446987112
+          },
+          "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model_base_test/baseline/seed_42/metrics.json"
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 2.9297690391540527,
+            "mrr": 0.7249807715415955,
+            "hits_1": 0.6085329651832581,
+            "hits_3": 0.8042910099029541,
+            "hits_10": 0.9479557871818542,
+            "auroc": 0.9694144780817678
+          },
+          "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model_base_test/baseline/seed_43/metrics.json"
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 2.9864702224731445,
+            "mrr": 0.7182489633560181,
+            "hits_1": 0.6014575362205505,
+            "hits_3": 0.7969868183135986,
+            "hits_10": 0.9450471997261047,
+            "auroc": 0.9703820175029787
+          },
+          "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model_base_test/baseline/seed_44/metrics.json"
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 2.8946533203125,
+            "mrr": 0.727386474609375,
+            "hits_1": 0.6109513640403748,
+            "hits_3": 0.808294415473938,
+            "hits_10": 0.9484786987304688,
+            "auroc": 0.969832425856113
+          },
+          "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model_base_test/baseline/seed_45/metrics.json"
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 2.9889702796936035,
+            "mrr": 0.7154097557067871,
+            "hits_1": 0.5955096483230591,
+            "hits_3": 0.7968234419822693,
+            "hits_10": 0.9459623098373413,
+            "auroc": 0.9681105679425088
+          },
+          "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model_base_test/baseline/seed_46/metrics.json"
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 2.9290990352630617,
+        "mrr": 0.7231256842613221,
+        "hits_1": 0.6058498620986938,
+        "hits_3": 0.8036439180374145,
+        "hits_10": 0.9477891325950623,
+        "auroc": 0.9697499668164159
+      }
+    }
+  }
+}

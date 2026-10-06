@@ -1,0 +1,26 @@
+{
+  "encoder": "model_base_test",
+  "config": "fusion_fusion_gate_py",
+  "seed": 42,
+  "use_projector": false,
+  "use_adaptive_fusion": true,
+  "fusion_variant": "fusion_gate_py",
+  "use_node_id": false,
+  "use_residual_rgcn": false,
+  "use_jumping_knowledge": false,
+  "use_ppr": false,
+  "ppr_num_layers": 2,
+  "ppr_c": 0.15,
+  "ppr_eps": 0.0001,
+  "ppr_num_iter": 50,
+  "ppr_topk": 50,
+  "ppr_batch_size": 128,
+  "mr": 3.700300693511963,
+  "mrr": 0.6596210598945618,
+  "hits": {
+    "1": 0.5311774611473083,
+    "3": 0.7380470037460327,
+    "10": 0.9188699126243591
+  },
+  "auroc": 0.9613226349736615
+}

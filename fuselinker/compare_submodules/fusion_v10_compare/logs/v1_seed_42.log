@@ -1,0 +1,37 @@
+Data: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/suppkg
+Checkpoint: /home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model_base_test/fusion_v1/seed_42/model_state.pth
+model_base_test config: fusion_v1
+Modules | projector=False adaptive_fusion=True fusion_variant=v1 node_id=False residual_rgcn=False jumping_knowledge=False ppr=False
+Hyperparameters | seed=42 w=0.75 n_hidden=200 num_hidden_layers=2 num_bases=20 dropout=0.2 lr=0.001 reg_param=0.01 iterations=40000 graph_batch_size=250 graph_split_size=0.5 negative_sample=20 eval_protocol=filtered ppr_c=0.15 ppr_eps=0.0001 ppr_num_iter=50 ppr_topk=50 ppr_batch_size=128 ppr_num_layers=2
+Loading Pretrained Embeddings files...
+Loaded Text Embeddings file successfully!
+Loaded Domain Knowledge Embeddings file successfully!
+w: 0.75
+Data Processing...
+# entities: 43474
+# relations: 15
+# edges: 305986
+Loaded pretrained domain embeddings, freeze is False.
+Loaded pretrained text embeddings, freeze is False.
+Initialized random relation embeddings.
+cuda
+Task 1 DistMult | Encoder: compare_submodules/model_base_test.py
+/home/anhlq/Documents/2026-ltt/FuseLinker2026/.venv/lib/python3.10/site-packages/dgl/heterograph.py:92: DGLWarning: Recommend creating graphs by `dgl.graph(data)` instead of `dgl.DGLGraph(data)`.
+  dgl_warning(
+Start training (masked-entity DistMult)...
+/home/anhlq/Documents/2026-ltt/FuseLinker2026/.venv/lib/python3.10/site-packages/dgl/heterograph.py:92: DGLWarning: Recommend creating graphs by `dgl.graph(data)` instead of `dgl.DGLGraph(data)`.
+  dgl_warning(
+Traceback (most recent call last):
+  File "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/train_compare_model_base_test.py", line 562, in <module>
+    main(parser.parse_args())
+  File "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/train_compare_model_base_test.py", line 324, in main
+    optimizer.step()
+  File "/home/anhlq/Documents/2026-ltt/FuseLinker2026/.venv/lib/python3.10/site-packages/torch/optim/optimizer.py", line 373, in wrapper
+    out = func(*args, **kwargs)
+  File "/home/anhlq/Documents/2026-ltt/FuseLinker2026/.venv/lib/python3.10/site-packages/torch/optim/optimizer.py", line 76, in _use_grad
+    ret = func(self, *args, **kwargs)
+  File "/home/anhlq/Documents/2026-ltt/FuseLinker2026/.venv/lib/python3.10/site-packages/torch/optim/adam.py", line 154, in step
+    self._init_group(
+  File "/home/anhlq/Documents/2026-ltt/FuseLinker2026/.venv/lib/python3.10/site-packages/torch/optim/adam.py", line 111, in _init_group
+    state['exp_avg_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format)
+torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 128.00 MiB. GPU 0 has a total capacty of 23.52 GiB of which 47.75 MiB is free. Process 2594436 has 20.47 GiB memory in use. Process 2632314 has 652.00 MiB memory in use. Process 2648440 has 1.32 GiB memory in use. Including non-PyTorch memory, this process has 1.01 GiB memory in use. Of the allocated memory 544.05 MiB is allocated by PyTorch, and 27.95 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF

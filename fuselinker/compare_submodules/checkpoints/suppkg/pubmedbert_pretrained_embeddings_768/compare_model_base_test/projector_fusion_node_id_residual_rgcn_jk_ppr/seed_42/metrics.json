@@ -1,0 +1,25 @@
+{
+  "encoder": "model_base_test",
+  "config": "projector_fusion_node_id_residual_rgcn_jk_ppr",
+  "seed": 42,
+  "use_projector": true,
+  "use_adaptive_fusion": true,
+  "use_node_id": true,
+  "use_residual_rgcn": true,
+  "use_jumping_knowledge": true,
+  "use_ppr": true,
+  "ppr_num_layers": 2,
+  "ppr_c": 0.15,
+  "ppr_eps": 0.0001,
+  "ppr_num_iter": 50,
+  "ppr_topk": 50,
+  "ppr_batch_size": 128,
+  "mr": 2.7853033542633057,
+  "mrr": 0.80111163854599,
+  "hits": {
+    "1": 0.7192228436470032,
+    "3": 0.8590477108955383,
+    "10": 0.9498186111450195
+  },
+  "auroc": 0.9820653481751067
+}

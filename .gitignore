@@ -65,6 +65,18 @@ outputs/
 wandb/
 roc_curve.png
 
+# GitHub từ chối blob > 100 MB (trọng số *.pth và embedding lớn vẫn để local).
+# Giữ split đồ thị và artifact thí nghiệm compare_submodules.
+!fuselinker/*/train.tsv
+!fuselinker/*/valid.tsv
+!fuselinker/*/test.tsv
+!fuselinker/*/train.txt
+!fuselinker/*/valid.txt
+!fuselinker/*/test.txt
+!fuselinker/compare_submodules/**/*.log
+!fuselinker/compare_submodules/**/roc_curve.png
+!fuselinker/compare_submodules/checkpoints/**/ppr_cache/*.pt
+
 # Giữ lại tài liệu trong docs/
 !fuselinker/docs/**
 !fuselinker/**/docs/**

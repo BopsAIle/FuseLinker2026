@@ -67,7 +67,6 @@
 # genes. We utilize the auxiliary network Gppr as the complement
 # to the biomolecular network to capture more useful structural
 # similarities of genes
-import copy
 from pathlib import Path
 
 import dgl
@@ -78,6 +77,12 @@ import scipy.sparse as sp
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
+
+# SSL uses feature-space PPR on the *visible* graph, never a global graph
+# containing the reconstruction targets. No dense N x N matrix is needed.
+MASK_SAFE_PPR = True
+GLOBAL_MASKED_PPR = True
 
 
 # ================================================================
@@ -488,6 +493,34 @@ class PPRGraphConv(nn.Module):
         return h
 
 
+def _diffuse_features(graph, x, inv, c, steps):
+    with graph.local_scope():
+        h = x
+        for _ in range(steps):
+            graph.ndata['ppr_h'] = h * inv
+            graph.update_all(fn.copy_u('ppr_h', 'm'), fn.sum('m', 'ppr_sum'))
+            h = c * (graph.ndata['ppr_sum'] + h * inv) * inv + (1-c) * x
+        return h
+
+
+class _PPRDiffusion(torch.autograd.Function):
+    """Exact adjoint of finite PPR, without retaining each walk activation."""
+    @staticmethod
+    def forward(ctx, x, graph, c, steps):
+        inv = (graph.in_degrees().to(x.dtype) + 1).rsqrt().unsqueeze(-1)
+        ctx.graph, ctx.c, ctx.steps = graph, c, steps
+        ctx.save_for_backward(inv)
+        return _diffuse_features(graph, x, inv, c, steps)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (inv,) = ctx.saved_tensors
+        # Use the original normalization even for a directed caller's graph.
+        transpose = dgl.reverse(ctx.graph, copy_ndata=False, copy_edata=False)
+        grad_x = _diffuse_features(transpose, grad_output, inv, ctx.c, ctx.steps)
+        return grad_x, None, None, None
+
+
 class PPRBranch(nn.Module):
     """
     Nhánh phụ chạy trên toàn bộ num_nodes với auxiliary network Gppr.
@@ -497,8 +530,13 @@ class PPRBranch(nn.Module):
     bậc node và độ gần của cặp node) được truyền nguyên vẹn vào fusion residual.
     """
 
-    def __init__(self, hidden_dim, num_layers=2):
+    def __init__(self, hidden_dim, num_layers=2, c=0.15, num_iter=8):
         super().__init__()
+        if num_layers < 1 or not 0 <= c < 1 or num_iter < 1:
+            raise ValueError('PPR requires layers >= 1, 0 <= c < 1, iterations >= 1')
+        self.c = float(c)
+        self.num_iter = int(num_iter)
+        self.mass_projection = nn.Linear(1, hidden_dim, bias=False)
         self.layers = nn.ModuleList([
             PPRGraphConv(
                 hidden_dim, hidden_dim,
@@ -508,20 +546,27 @@ class PPRBranch(nn.Module):
             for i in range(num_layers)
         ])
 
-    def forward(self, ppr_graph, x, edge_weight):
-        h = x
+    def diffuse(self, graph, x):
+        # S 1 retains structural mass that feature LayerNorm would remove.
+        ones = x.new_ones((x.shape[0], 1))
+        return _PPRDiffusion.apply(torch.cat((x, ones), dim=-1), graph, self.c, self.num_iter)
+
+    def project(self, h):
+        mass = h[:, -1:].clamp_min(1e-8).log() / max(self.c, 1e-6)
+        h = h[:, :-1]
         for layer in self.layers:
-            h = layer(ppr_graph, h, edge_weight)
-        return h
+            h = layer.act(layer.norm(layer.linear(h)))
+        return h + self.mass_projection(mass)
+
+    def forward(self, graph, x, edge_weight=None):
+        return self.project(self.diffuse(graph, x))
 
 #Hàm biến đổi text embedding về chiều cùng chiều với domain embedding
 class TextEmbeddingAutoencoder(nn.Module):
     def __init__(self, input_dim, encoding_dim, dropout_rate=0.2):
         super(TextEmbeddingAutoencoder, self).__init__()
-        # LayerNorm thay cho BatchNorm1d: encoder được gọi cả trên subgraph (nhánh RGCN)
-        # lẫn trên toàn bộ N node (nhánh PPR) trong cùng một forward, nên BatchNorm sẽ
-        # nhiễm running-stats giữa 2 phân phối batch và lệch train/eval. LayerNorm chuẩn
-        # hóa theo từng sample -> nhất quán, không phụ thuộc kích thước batch.
+        # Per-node normalization permits chunked full-graph encoding without
+        # changing features with chunk size or maintaining batch running stats.
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, encoding_dim * 2),
             nn.LayerNorm(encoding_dim * 2),
@@ -557,26 +602,34 @@ class MLPProjector(nn.Module):
             nn.ReLU(True),
             nn.Linear(hidden_dim * 2, hidden_dim),
         )
+        self.norm = nn.LayerNorm(hidden_dim)
 
     def forward(self, x):
-        return self.net(x)
+        return self.norm(self.net(x))
 
 
 class FusionGate(nn.Module):
     """
     Trộn 2 nguồn bằng trọng số học được (flex), thay cho w cố định của model.py.
-    gate = sigmoid(Linear([a, b]));  h = gate * a + (1 - gate) * b
-    Nếu truyền w, neo nhẹ gate về prior đó.
+    gate = sigmoid(logit(w) + Linear([a, b])). The learned offset starts at zero.
+    Therefore the initial mixture is exactly w*a + (1-w)*b.
     """
 
     def __init__(self, hidden_dim):
         super().__init__()
         self.fc = nn.Linear(hidden_dim * 2, hidden_dim)
+        nn.init.zeros_(self.fc.weight)
+        nn.init.zeros_(self.fc.bias)
 
     def forward(self, a, b, w=None):
-        gate = torch.sigmoid(self.fc(torch.cat([a, b], dim=-1)))
-        if w is not None:
-            gate = 0.5 * gate + 0.5 * w
+        logits = self.fc(torch.cat([a, b], dim=-1))
+        prior = torch.as_tensor(0.5 if w is None else w, dtype=a.dtype, device=a.device)
+        if torch.any((prior < 0) | (prior > 1)):
+            raise ValueError('Fusion prior w must be in [0, 1]')
+        safe = prior.clamp(1e-6, 1 - 1e-6)
+        gate = torch.sigmoid(logits + torch.logit(safe))
+        gate = torch.where(prior == 0, torch.zeros_like(gate), gate)
+        gate = torch.where(prior == 1, torch.ones_like(gate), gate)
         return gate * a + (1.0 - gate) * b
 
 
@@ -587,9 +640,8 @@ class ResidualPPRFusion(nn.Module):
 
     Khác với FusionGate (gate*a + (1-gate)*b, khởi tạo gate~0.5 -> pha loãng ngay
     50% tín hiệu backbone), ở đây fc được khởi tạo 0 và bias âm nên g ~ 0 lúc đầu:
-    output bắt đầu bằng đúng h_main (tương đương base), rồi model mới học cách
-    "cộng thêm" thông tin cấu trúc từ PPR. Nhờ vậy upgrade không tệ hơn base ngay
-    từ đầu và chỉ có thể cải thiện ở degree/edge.
+    Output starts close to h_main. This initialization does not guarantee
+    improvement over the baseline; that must be measured on held-out data.
     """
 
     def __init__(self, hidden_dim, init_bias=-3.0):
@@ -688,6 +740,9 @@ class EmbeddingLayer(nn.Module):
                     f"`srcIndex < srcSelectDimSize`."
                 )
             domain_embeddings = torch.from_numpy(pretrained_domain_embeddings).float()
+            domain_embeddings = (
+                domain_embeddings - domain_embeddings.mean(0, keepdim=True)
+            ) / domain_embeddings.std(0, unbiased=False, keepdim=True).clamp_min(1e-6)
             self.domain_embeddings = nn.Embedding.from_pretrained(
                 domain_embeddings, freeze=freeze
             )
@@ -730,11 +785,12 @@ class EmbeddingLayer(nn.Module):
         self.fusion_gate = FusionGate(hidden_dim)
 
     def forward(self, graph, node_ids, rel_ids, norm):
-        node_ids = node_ids.squeeze()
+        node_ids = node_ids.reshape(-1)
 
         # text branch
         raw_text = self.text_embeddings(node_ids)
-        text_x, _ = self.autoencoder(raw_text)
+        # Reconstruction is not part of the SSL objective; do not execute decoder.
+        text_x = self.autoencoder.encoder(raw_text)
         text_x = self.text_post(text_x)
 
         # domain branch
@@ -742,9 +798,7 @@ class EmbeddingLayer(nn.Module):
         domain_x = self.domain_projector(raw_domain)
 
         # prior từ w để không mất hẳn ý tưởng weighted fusion ban đầu
-        w_prior = torch.full_like(text_x, float(self.w))
-
-        fused = self.fusion_gate(text_x, domain_x, w=w_prior)
+        fused = self.fusion_gate(text_x, domain_x, w=self.w)
         return fused
 
 
@@ -801,9 +855,23 @@ class EdgeTypeClassifier(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, num_classes),
         )
+        # Pair compatibility complements the ordered endpoint classifier.
+        # Normalization bounds product features without discarding the raw
+        # magnitudes available to the original endpoint path.
+        self.interaction = nn.Sequential(
+            nn.Linear(2 * hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, num_classes),
+        )
+        nn.init.zeros_(self.interaction[-1].weight)
+        nn.init.zeros_(self.interaction[-1].bias)
 
     def forward(self, h_src, h_dst):
-        return self.net(torch.cat([h_src, h_dst], dim=-1))
+        a = F.layer_norm(h_src, (h_src.shape[-1],))
+        b = F.layer_norm(h_dst, (h_dst.shape[-1],))
+        pair = torch.cat([a * b, torch.abs(a - b)], dim=-1)
+        return self.net(torch.cat([h_src, h_dst], dim=-1)) + self.interaction(pair)
 
 
 class DegreeClassifier(nn.Module):
@@ -814,6 +882,8 @@ class DegreeClassifier(nn.Module):
 
     def __init__(self, hidden_dim, num_bins, dropout=0.2):
         super().__init__()
+        self.register_buffer("sampling_log_prior", torch.zeros(num_bins))
+        self.register_buffer("active_bins", torch.ones(num_bins, dtype=torch.bool))
         self.net = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(True),
@@ -821,8 +891,37 @@ class DegreeClassifier(nn.Module):
             nn.Linear(hidden_dim, num_bins),
         )
 
+    @torch.no_grad()
+    def configure_sampling_prior(self, degrees, labels, class_weights,
+                                 sample_size, num_edges, full_graph=False):
+        """Balance degree classes using training-graph statistics only.
+
+        Uniform edge batches include hubs more often than low-degree nodes.
+        Approximate node inclusion probability (sampling fraction is small),
+        then account for the class weights already used by cross entropy.
+        The learned raw logits represent a uniform class prior for macro metrics.
+        """
+        degrees = degrees.reshape(-1).to(self.sampling_log_prior.device).float()
+        labels = labels.to(degrees.device)
+        if full_graph:
+            inclusion = torch.ones_like(degrees)
+        elif sample_size >= num_edges:
+            inclusion = (degrees > 0).to(degrees.dtype)
+        else:
+            fraction = (degrees / max(int(num_edges), 1)).clamp(0, 1 - 1e-7)
+            inclusion = -torch.expm1(min(sample_size, num_edges) * torch.log1p(-fraction))
+        mass = torch.zeros_like(self.sampling_log_prior)
+        mass.scatter_add_(0, labels, inclusion)
+        mass *= class_weights.to(mass.device)
+        self.active_bins.copy_(torch.bincount(labels, minlength=len(mass)) > 0)
+        prior = mass / mass.sum().clamp_min(1e-12)
+        self.sampling_log_prior.copy_(prior.clamp_min(1e-8).log())
+
     def forward(self, h):
-        return self.net(h)
+        logits = self.net(h)
+        if self.training:
+            logits = logits + self.sampling_log_prior
+        return logits.masked_fill(~self.active_bins, -1e4)
 
 
 class LinkPredict(nn.Module):
@@ -835,7 +934,8 @@ class LinkPredict(nn.Module):
                  regularization_param=0.0,
                  pretrained_text_embeddings=None, pretrained_domain_embeddings=None,
                  pretrained_relation_embeddings=None, freeze=False, w=0.5,
-                 use_ppr=True, ppr_num_layers=2, ppr_fanout=15):
+                 use_ppr=True, ppr_num_layers=2, ppr_fanout=15,
+                 ppr_c=0.85, ppr_iterations=8):
         super(LinkPredict, self).__init__()
 
         # giữ đúng convention cũ: num_relations * 2 cho graph conv
@@ -858,7 +958,8 @@ class LinkPredict(nn.Module):
         # Nhánh auxiliary PPR (HGDC style) - song song với RGCN
         self.use_ppr = use_ppr
         if use_ppr:
-            self.ppr_branch = PPRBranch(hidden_dim, num_layers=ppr_num_layers)
+            self.ppr_branch = PPRBranch(hidden_dim, num_layers=ppr_num_layers,
+                                        c=ppr_c, num_iter=ppr_iterations)
             # Fusion residual: bắt đầu ~ base (h_rgcn), học cách cộng thêm tín hiệu PPR.
             self.ppr_fusion = ResidualPPRFusion(hidden_dim)
             self.ppr_fanout = int(ppr_fanout)
@@ -886,89 +987,53 @@ class LinkPredict(nn.Module):
         score = torch.sum(subject_embeddings * relation_embeddings * object_embeddings, dim=1)
         return score
 
-    def _ensure_ppr_weight(self, ppr_graph, ppr_edge_weight):
-        if "ppr_w" in ppr_graph.edata:
-            return ppr_graph
-        w = ppr_edge_weight
-        if w is None:
-            raise ValueError("PPR graph is missing edata['ppr_w'] and ppr_edge_weight is None.")
-        ppr_graph.edata["ppr_w"] = w.detach().to(ppr_graph.device).reshape(-1, 1)
-        return ppr_graph
-
-    def _ppr_sampled(self, ppr_graph, seed_ids, device):
-        """
-        Neighbor-sampled PPR GCN for the current seed nodes.
-        Keeps the full Gppr on CPU and only moves a small block to GPU.
-        """
-        g_cpu = ppr_graph if ppr_graph.device.type == "cpu" else ppr_graph.cpu()
-        frontier = seed_ids.detach().cpu().long().view(-1)
-        fanout = max(int(self.ppr_fanout), 1)
-        blocks = []
-        for _ in range(len(self.ppr_branch.layers)):
-            sg = dgl.sampling.sample_neighbors(
-                g_cpu, frontier, fanout, edge_dir="in"
-            )
-            block = dgl.to_block(sg, dst_nodes=frontier)
-            frontier = block.srcdata[dgl.NID]
-            blocks.insert(0, block)
-
-        src_ids = blocks[0].srcdata[dgl.NID].to(device)
-        h = self.rgcn.encode_input(src_ids.view(-1, 1))
-        for block, layer in zip(blocks, self.ppr_branch.layers):
-            block = block.to(device)
-            ew = block.edata["ppr_w"].reshape(-1)
-            h = layer(block, h, ew)
-        return h
-
-    def _ppr_full_cpu(self, ppr_graph, ppr_edge_weight, all_node_ids, ids, device):
-        """
-        Full-graph PPR encode on CPU (eval). Does not move training params off GPU
-        — uses a tiny deepcopy of ppr_branch so Adam state stays valid.
-        """
-        n = ppr_graph.number_of_nodes()
-        ids_all = all_node_ids.to(device)
-        chunks = []
-        bs = 4096
-        for start in range(0, n, bs):
-            chunks.append(self.rgcn.encode_input(ids_all[start:start + bs]).detach().cpu())
-        x = torch.cat(chunks, dim=0)
-        g_cpu = ppr_graph.cpu()
-        if "ppr_w" in g_cpu.edata:
-            ew = g_cpu.edata["ppr_w"].cpu().reshape(-1)
-        else:
-            ew = ppr_edge_weight.detach().cpu().reshape(-1)
-        branch_cpu = copy.deepcopy(self.ppr_branch).cpu().eval()
-        with torch.no_grad():
-            h_full = branch_cpu(g_cpu, x, ew)
-        del branch_cpu
-        return h_full[ids.detach().cpu()].to(device)
-
-    def _ppr_features(self, ppr_graph, ppr_edge_weight, node_ids, all_node_ids):
-        ids = node_ids.squeeze()
-        device = ids.device
-        g = self._ensure_ppr_weight(ppr_graph, ppr_edge_weight)
-        if self.training:
-            return self._ppr_sampled(g, ids, device)
-        return self._ppr_full_cpu(g, ppr_edge_weight, all_node_ids, ids, device)
-
     def forward(self, graph, node_ids, rel_ids, norm,
-                ppr_graph=None, ppr_edge_weight=None, all_node_ids=None):
-        """
-        - graph, node_ids, rel_ids, norm: nhánh RGCN (subgraph huấn luyện hoặc full test graph).
-        - ppr_graph, ppr_edge_weight, all_node_ids: nhánh PPR.
-          Train: sample neighborhood trên CPU rồi GCN trên GPU.
-          Eval: PPR GCN full graph trên CPU để khỏi OOM card 4GB.
-          Nếu để None, model trượt về hành vi cũ (chỉ RGCN).
-        """
-        h_rgcn = self.rgcn(graph, node_ids, rel_ids, norm)
+                ppr_graph=None, ppr_edge_weight=None, all_node_ids=None,
+                context_graph=None, masked_pairs=None):
+        """RGCN on the batch, PPR on train context with target pairs removed.
 
-        if self.use_ppr and ppr_graph is not None and all_node_ids is not None:
-            h_ppr = self._ppr_features(
-                ppr_graph, ppr_edge_weight, node_ids, all_node_ids
-            )
-            return self.ppr_fusion(h_rgcn, h_ppr)
-
-        return h_rgcn
+        Legacy precomputed PPR arguments are ignored because target influence
+        cannot be removed reliably from an already diffused adjacency.
+        """
+        ids = node_ids.reshape(-1)
+        if self.use_ppr and context_graph is not None:
+            if context_graph.num_nodes() != self.rgcn.num_nodes:
+                raise ValueError('Context graph must use global node IDs')
+            context = context_graph
+            if self.training:
+                if masked_pairs is None:
+                    raise ValueError('Training with global context requires masked_pairs')
+                src, dst = context.edges()
+                pairs = masked_pairs.to(src.device).reshape(-1, 2)
+                n = context.num_nodes()
+                excluded = torch.cat((pairs[:, 0] * n + pairs[:, 1],
+                                      pairs[:, 1] * n + pairs[:, 0]))
+                keep = ~torch.isin(src * n + dst, excluded)
+                context = dgl.edge_subgraph(context, keep.nonzero().reshape(-1),
+                                           relabel_nodes=False)
+            full_ids = torch.arange(context.num_nodes(), device=ids.device)
+            if self.training and torch.is_grad_enabled():
+                full_x = torch.cat([
+                    checkpoint(self.rgcn.encode_input, part, use_reentrant=False)
+                    for part in full_ids.split(1024)
+                ], dim=0)
+            else:
+                full_x = self.rgcn.encode_input(full_ids)
+            x = full_x[ids]
+        else:
+            context = graph
+            x = self.rgcn.encode_input(ids)
+            full_x = x
+        h_rgcn = x
+        for layer in self.rgcn.layers[1:]:
+            h_rgcn = layer(graph, h_rgcn, rel_ids, norm)
+        if not self.use_ppr:
+            return h_rgcn
+        diffused = self.ppr_branch.diffuse(context, full_x)
+        if context_graph is not None:
+            diffused = diffused[ids]
+        h_ppr = self.ppr_branch.project(diffused)
+        return self.ppr_fusion(h_rgcn, h_ppr)
 
     def regularization_loss(self, embeddings):
         return torch.mean(embeddings.pow(2)) + torch.mean(self.relation_weights.pow(2))
@@ -987,8 +1052,17 @@ class LinkPredict(nn.Module):
         """
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = cls(**init_kwargs)
         checkpoint = torch.load(checkpoint_path, map_location=device)
+        meta = checkpoint.get('meta', {})
+        ssl_meta = meta.get('ssl', {})
+        for key, saved_key in (('ppr_c', 'ppr_c'),
+                               ('ppr_iterations', 'ppr_iterations'),
+                               ('ppr_num_layers', 'ppr_num_layers')):
+            if saved_key in ssl_meta:
+                init_kwargs.setdefault(key, ssl_meta[saved_key])
+        if meta.get('use_ppr') is not None:
+            init_kwargs.setdefault('use_ppr', meta['use_ppr'])
+        model = cls(**init_kwargs)
         try:
             model.load_state_dict(checkpoint["state_dict"])
         except RuntimeError as exc:

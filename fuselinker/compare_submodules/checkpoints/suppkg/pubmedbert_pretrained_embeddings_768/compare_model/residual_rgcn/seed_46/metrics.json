@@ -1,0 +1,17 @@
+{
+  "encoder": "model",
+  "seed": 46,
+  "fusion_variant": "fixed",
+  "use_domain_mlp_projector": false,
+  "domain_map": "linear",
+  "use_residual_rgcn": true,
+  "rgcn_block": "residual_rgcn",
+  "mr": 2.5122389793395996,
+  "mrr": 0.7725850939750671,
+  "hits": {
+    "1": 0.6699892282485962,
+    "3": 0.84793621301651,
+    "10": 0.9610444903373718
+  },
+  "auroc": 0.9888119941104143
+}

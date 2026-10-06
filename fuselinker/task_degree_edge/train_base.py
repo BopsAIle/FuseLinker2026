@@ -39,10 +39,12 @@ from ssl_eval import (
     evaluate_ssl_edge,
     final_ckpt_path,
     format_ssl_log,
+    seed_everything,
 )
 
 
 def main(args):
+    seed_everything(args.seed)
     args.data = resolve_data_dir(args.data)
     args.ssl_model_state_file = ensure_parent(resolve_path(args.ssl_model_state_file))
     print(f"Data: {args.data}")
@@ -111,7 +113,6 @@ def main(args):
     eval_neg_rate = (
         args.negative_sample if args.eval_neg_rate is None else args.eval_neg_rate
     )
-    eval_rng = np.random.RandomState(42)
 
     model = LinkPredict(
         num_nodes,
@@ -286,7 +287,7 @@ def main(args):
             edge_metrics = evaluate_ssl_edge(
                 full_embed, edge_head, valid_data_np, num_rels, eval_neg_rate,
                 total_data_np, device,
-                max_triples=args.eval_max_triples, rng=eval_rng,
+                max_triples=args.eval_max_triples, rng=np.random.RandomState(42),
             )
 
             if edge_metrics["loss"] < best_valid_loss_edge:
@@ -322,7 +323,7 @@ def main(args):
     test_edge = evaluate_ssl_edge(
         full_embed, edge_head, test_data_np, num_rels, eval_neg_rate,
         total_data_np, device,
-        max_triples=args.eval_max_triples, rng=eval_rng,
+        max_triples=args.eval_max_triples, rng=np.random.RandomState(43),
     )
     test_deg = evaluate_ssl_degree(full_embed, degree_head, degree_label_full)
     if loss_weighter is not None:
@@ -489,5 +490,6 @@ if __name__ == "__main__":
         help="Checkpoint SSL baseline (relative paths resolve under fuselinker/).",
     )
 
+    parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
     main(args)

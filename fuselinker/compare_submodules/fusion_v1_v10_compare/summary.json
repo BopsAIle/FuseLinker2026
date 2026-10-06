@@ -1,0 +1,701 @@
+{
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "variants": {
+    "v1": {
+      "code": "class FusionV1(nn.Module):\n    def __init__(self, hidden_dim):\n        super().__init__()\n        self.gate = nn.Linear(hidden_dim * 2, hidden_dim)\n\n    def forward(self, text_x, domain_x):\n        gate = torch.sigmoid(\n            self.gate(torch.cat([text_x, domain_x], dim=-1))\n        )\n\n        return gate * text_x + (1.0 - gate) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 3.0846433639526367,
+            "mrr": 0.7130782604217529,
+            "hits_1": 0.5957874655723572,
+            "hits_3": 0.7909408807754517,
+            "hits_10": 0.9400306940078735,
+            "auroc": 0.9713384765938625
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.1043007373809814,
+            "mrr": 0.7081676721572876,
+            "hits_1": 0.5881401300430298,
+            "hits_3": 0.7879669070243835,
+            "hits_10": 0.9406189918518066,
+            "auroc": 0.9785373435504378
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.050050735473633,
+            "mrr": 0.7039477229118347,
+            "hits_1": 0.5822085738182068,
+            "hits_3": 0.7836530804634094,
+            "hits_10": 0.9440014362335205,
+            "auroc": 0.9708003252051585
+          }
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 3.3636720180511475,
+            "mrr": 0.6895532011985779,
+            "hits_1": 0.5672571063041687,
+            "hits_3": 0.7679336071014404,
+            "hits_10": 0.9307166934013367,
+            "auroc": 0.9643861938471071
+          }
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 3.2251052856445312,
+            "mrr": 0.7032970786094666,
+            "hits_1": 0.5838589668273926,
+            "hits_3": 0.7819536328315735,
+            "hits_10": 0.9360273480415344,
+            "auroc": 0.9679655971277913
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.165554428100586,
+        "mrr": 0.7036087870597839,
+        "hits_1": 0.583450448513031,
+        "hits_3": 0.7824896216392517,
+        "hits_10": 0.9382790327072144,
+        "auroc": 0.9706055872648716
+      }
+    },
+    "v2": {
+      "code": "class FusionV2(nn.Module):\n    def __init__(self, hidden_dim):\n        super().__init__()\n\n        self.gate = nn.Linear(hidden_dim * 2, hidden_dim)\n\n        nn.init.zeros_(self.gate.weight)\n        nn.init.zeros_(self.gate.bias)\n\n    def forward(self, text_x, domain_x):\n        gate = torch.sigmoid(\n            self.gate(torch.cat([text_x, domain_x], dim=-1))\n        )\n\n        return gate * text_x + (1.0 - gate) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 2.9197685718536377,
+            "mrr": 0.7239612936973572,
+            "hits_1": 0.6075688600540161,
+            "hits_3": 0.8033432364463806,
+            "hits_10": 0.9468936920166016,
+            "auroc": 0.9738905037858743
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.245612621307373,
+            "mrr": 0.6957854628562927,
+            "hits_1": 0.5737605690956116,
+            "hits_3": 0.7752540707588196,
+            "hits_10": 0.9353737235069275,
+            "auroc": 0.9694109952192494
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.0721919536590576,
+            "mrr": 0.7105078101158142,
+            "hits_1": 0.5905258059501648,
+            "hits_3": 0.7911696434020996,
+            "hits_10": 0.9420078992843628,
+            "auroc": 0.9733388860763905
+          }
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 3.1142358779907227,
+            "mrr": 0.70582115650177,
+            "hits_1": 0.5838099122047424,
+            "hits_3": 0.7887349128723145,
+            "hits_10": 0.9402594566345215,
+            "auroc": 0.9705614484707644
+          }
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 2.9869930744171143,
+            "mrr": 0.7149363160133362,
+            "hits_1": 0.5960325598716736,
+            "hits_3": 0.7942743301391602,
+            "hits_10": 0.9446060061454773,
+            "auroc": 0.9681258803619893
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.0677604198455812,
+        "mrr": 0.710202407836914,
+        "hits_1": 0.5903395414352417,
+        "hits_3": 0.7905552387237549,
+        "hits_10": 0.9418281555175781,
+        "auroc": 0.9710655427828536
+      }
+    },
+    "v3": {
+      "code": "class FusionV3(nn.Module):\n    def __init__(self, hidden_dim):\n        super().__init__()\n\n        self.gate = nn.Linear(hidden_dim * 2, 1)\n\n    def forward(self, text_x, domain_x):\n        gate = torch.sigmoid(\n            self.gate(torch.cat([text_x, domain_x], dim=-1))\n        )\n\n        return gate * text_x + (1.0 - gate) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 2.8699631690979004,
+            "mrr": 0.7287054061889648,
+            "hits_1": 0.6130919456481934,
+            "hits_3": 0.807640790939331,
+            "hits_10": 0.9500147104263306,
+            "auroc": 0.9717061140399773
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.0044772624969482,
+            "mrr": 0.7189041376113892,
+            "hits_1": 0.6007549166679382,
+            "hits_3": 0.7997973561286926,
+            "hits_10": 0.9454393982887268,
+            "auroc": 0.9706109577726566
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.020719528198242,
+            "mrr": 0.7141720056533813,
+            "hits_1": 0.5938592553138733,
+            "hits_3": 0.7964639663696289,
+            "hits_10": 0.9444589614868164,
+            "auroc": 0.9725665615799501
+          }
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 3.0569136142730713,
+            "mrr": 0.7203285098075867,
+            "hits_1": 0.6053792834281921,
+            "hits_3": 0.7971829175949097,
+            "hits_10": 0.9421549439430237,
+            "auroc": 0.9728433791938605
+          }
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 3.0747082233428955,
+            "mrr": 0.7076771259307861,
+            "hits_1": 0.5856073498725891,
+            "hits_3": 0.7899604439735413,
+            "hits_10": 0.9427432417869568,
+            "auroc": 0.969784694298674
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.0053563594818113,
+        "mrr": 0.7179574370384216,
+        "hits_1": 0.5997385501861572,
+        "hits_3": 0.7982090950012207,
+        "hits_10": 0.9449622511863709,
+        "auroc": 0.9715023413770238
+      }
+    },
+    "v4": {
+      "code": "class FusionV4(nn.Module):\n    def __init__(self, hidden_dim):\n        super().__init__()\n\n        self.gate = nn.Linear(hidden_dim, hidden_dim)\n\n    def forward(self, text_x, domain_x):\n        diff = torch.abs(text_x - domain_x)\n\n        gate = torch.sigmoid(\n            self.gate(diff)\n        )\n\n        return gate * text_x + (1.0 - gate) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 3.2384390830993652,
+            "mrr": 0.6923050880432129,
+            "hits_1": 0.5684826374053955,
+            "hits_3": 0.7719860076904297,
+            "hits_10": 0.9365501999855042,
+            "auroc": 0.9710449073831506
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.1729142665863037,
+            "mrr": 0.7022197842597961,
+            "hits_1": 0.5804764628410339,
+            "hits_3": 0.7823294997215271,
+            "hits_10": 0.9394261240959167,
+            "auroc": 0.9662163531917201
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.035425901412964,
+            "mrr": 0.7099340558052063,
+            "hits_1": 0.589300274848938,
+            "hits_3": 0.790989875793457,
+            "hits_10": 0.9444916248321533,
+            "auroc": 0.9710833822802257
+          }
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 2.923804759979248,
+            "mrr": 0.7215404510498047,
+            "hits_1": 0.6022909283638,
+            "hits_3": 0.8043400049209595,
+            "hits_10": 0.9484460353851318,
+            "auroc": 0.9738817517721033
+          }
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 3.2675740718841553,
+            "mrr": 0.6923331618309021,
+            "hits_1": 0.5691852569580078,
+            "hits_3": 0.7720677256584167,
+            "hits_10": 0.935046911239624,
+            "auroc": 0.9692709277537567
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.1276316165924074,
+        "mrr": 0.7036665081977844,
+        "hits_1": 0.5819471120834351,
+        "hits_3": 0.784342622756958,
+        "hits_10": 0.940792179107666,
+        "auroc": 0.9702994644761912
+      }
+    },
+    "v5": {
+      "code": "class FusionV5(nn.Module):\n    def __init__(self, hidden_dim):\n        super().__init__()\n\n        self.gate = nn.Linear(hidden_dim * 3, hidden_dim)\n\n    def forward(self, text_x, domain_x):\n        diff = torch.abs(text_x - domain_x)\n\n        features = torch.cat(\n            [text_x, domain_x, diff],\n            dim=-1\n        )\n\n        gate = torch.sigmoid(\n            self.gate(features)\n        )\n\n        return gate * text_x + (1.0 - gate) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 3.1763129234313965,
+            "mrr": 0.7104883790016174,
+            "hits_1": 0.5935488343238831,
+            "hits_3": 0.7868067622184753,
+            "hits_10": 0.937971830368042,
+            "auroc": 0.9686269202004457
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.3238015174865723,
+            "mrr": 0.6960547566413879,
+            "hits_1": 0.5759992003440857,
+            "hits_3": 0.773113489151001,
+            "hits_10": 0.9338213801383972,
+            "auroc": 0.9700415311116051
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.0779764652252197,
+            "mrr": 0.7139759063720703,
+            "hits_1": 0.5968495607376099,
+            "hits_3": 0.7919866442680359,
+            "hits_10": 0.941713809967041,
+            "auroc": 0.9712020698187351
+          }
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 3.152717351913452,
+            "mrr": 0.7049553990364075,
+            "hits_1": 0.5844962000846863,
+            "hits_3": 0.7839308381080627,
+            "hits_10": 0.9413869976997375,
+            "auroc": 0.9707715694276533
+          }
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 2.892512798309326,
+            "mrr": 0.7208949327468872,
+            "hits_1": 0.6010000109672546,
+            "hits_3": 0.8044543862342834,
+            "hits_10": 0.9501127600669861,
+            "auroc": 0.976299903966234
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.1246642112731933,
+        "mrr": 0.7092738747596741,
+        "hits_1": 0.5903787612915039,
+        "hits_3": 0.7880584239959717,
+        "hits_10": 0.9410013556480408,
+        "auroc": 0.9713883989049347
+      }
+    },
+    "v6": {
+      "code": "class FusionV6(nn.Module):\n    def __init__(self, hidden_dim):\n        super().__init__()\n\n        self.gate = nn.Linear(hidden_dim * 3, hidden_dim)\n\n    def forward(self, text_x, domain_x):\n        interaction = text_x * domain_x\n\n        features = torch.cat(\n            [text_x, domain_x, interaction],\n            dim=-1\n        )\n\n        gate = torch.sigmoid(\n            self.gate(features)\n        )\n\n        return gate * text_x + (1.0 - gate) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 3.0777313709259033,
+            "mrr": 0.7103971242904663,
+            "hits_1": 0.5913428664207458,
+            "hits_3": 0.7893885374069214,
+            "hits_10": 0.9417464733123779,
+            "auroc": 0.9719427500366947
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.409670352935791,
+            "mrr": 0.695819079875946,
+            "hits_1": 0.5770776867866516,
+            "hits_3": 0.7715121507644653,
+            "hits_10": 0.9301121234893799,
+            "auroc": 0.9636319122019253
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.1330599784851074,
+            "mrr": 0.7125852108001709,
+            "hits_1": 0.5962122678756714,
+            "hits_3": 0.7881630063056946,
+            "hits_10": 0.9381842613220215,
+            "auroc": 0.9692552158891422
+          }
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 3.0671753883361816,
+            "mrr": 0.7118219137191772,
+            "hits_1": 0.5926827788352966,
+            "hits_3": 0.7913657426834106,
+            "hits_10": 0.9430700540542603,
+            "auroc": 0.9675780344185232
+          }
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 2.9651784896850586,
+            "mrr": 0.71905916929245,
+            "hits_1": 0.6024379730224609,
+            "hits_3": 0.7969704866409302,
+            "hits_10": 0.9452106356620789,
+            "auroc": 0.9731417898077603
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.1305631160736085,
+        "mrr": 0.7099364995956421,
+        "hits_1": 0.5919507145881653,
+        "hits_3": 0.7874799847602845,
+        "hits_10": 0.9396647095680237,
+        "auroc": 0.9691099404708092
+      }
+    },
+    "v7": {
+      "code": "class FusionV7(nn.Module):\n    def __init__(self, hidden_dim):\n        super().__init__()\n\n        bottleneck = max(hidden_dim // 4, 16)\n\n        self.gate = nn.Sequential(\n            nn.Linear(hidden_dim * 2, bottleneck),\n            nn.SiLU(),\n            nn.Linear(bottleneck, hidden_dim),\n            nn.Sigmoid()\n        )\n\n    def forward(self, text_x, domain_x):\n        features = torch.cat(\n            [text_x, domain_x],\n            dim=-1\n        )\n\n        gate = self.gate(features)\n\n        return gate * text_x + (1.0 - gate) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 3.198143720626831,
+            "mrr": 0.7028027772903442,
+            "hits_1": 0.5832706689834595,
+            "hits_3": 0.77955162525177,
+            "hits_10": 0.9383476376533508,
+            "auroc": 0.9685354552750303
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.04459285736084,
+            "mrr": 0.7193677425384521,
+            "hits_1": 0.6035981774330139,
+            "hits_3": 0.7967253923416138,
+            "hits_10": 0.9417464733123779,
+            "auroc": 0.971047141178599
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.052011489868164,
+            "mrr": 0.7031913995742798,
+            "hits_1": 0.5785319805145264,
+            "hits_3": 0.7880159616470337,
+            "hits_10": 0.9437400102615356,
+            "auroc": 0.9711918684813098
+          }
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 3.2666590213775635,
+            "mrr": 0.6990709900856018,
+            "hits_1": 0.5792182683944702,
+            "hits_3": 0.7761855125427246,
+            "hits_10": 0.934654712677002,
+            "auroc": 0.9719619746688108
+          }
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 3.3257131576538086,
+            "mrr": 0.6938035488128662,
+            "hits_1": 0.5720611810684204,
+            "hits_3": 0.7718879580497742,
+            "hits_10": 0.9331187009811401,
+            "auroc": 0.9674296485615173
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.1774240493774415,
+        "mrr": 0.7036472916603088,
+        "hits_1": 0.5833360552787781,
+        "hits_3": 0.7824732899665833,
+        "hits_10": 0.9383215069770813,
+        "auroc": 0.9700332176330534
+      }
+    },
+    "v8": {
+      "code": "class FusionV8(nn.Module):\n    def __init__(self, hidden_dim):\n        super().__init__()\n\n        self.base_gate = nn.Parameter(\n            torch.zeros(hidden_dim)\n        )\n\n        self.node_gate = nn.Linear(\n            hidden_dim * 2,\n            hidden_dim\n        )\n\n        nn.init.zeros_(self.node_gate.weight)\n        nn.init.zeros_(self.node_gate.bias)\n\n    def forward(self, text_x, domain_x):\n        node_adjustment = self.node_gate(\n            torch.cat([text_x, domain_x], dim=-1)\n        )\n\n        gate = torch.sigmoid(\n            self.base_gate + node_adjustment\n        )\n\n        return gate * text_x + (1.0 - gate) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 2.9131507873535156,
+            "mrr": 0.7195528149604797,
+            "hits_1": 0.6007875800132751,
+            "hits_3": 0.8007124662399292,
+            "hits_10": 0.9478577971458435,
+            "auroc": 0.9746697502179115
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.248553991317749,
+            "mrr": 0.6983005404472351,
+            "hits_1": 0.5772574543952942,
+            "hits_3": 0.7776888012886047,
+            "hits_10": 0.9349815249443054,
+            "auroc": 0.9677339403107919
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.1654956340789795,
+            "mrr": 0.7056854367256165,
+            "hits_1": 0.5855746865272522,
+            "hits_3": 0.7848949432373047,
+            "hits_10": 0.9380372166633606,
+            "auroc": 0.9747796403511575
+          }
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 3.370894432067871,
+            "mrr": 0.6926409602165222,
+            "hits_1": 0.571930468082428,
+            "hits_3": 0.770384669303894,
+            "hits_10": 0.9307166934013367,
+            "auroc": 0.9654389881035423
+          }
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 3.114922046661377,
+            "mrr": 0.7093446254730225,
+            "hits_1": 0.5915062427520752,
+            "hits_3": 0.7867577075958252,
+            "hits_10": 0.9393607378005981,
+            "auroc": 0.9652564715823021
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.1626033782958984,
+        "mrr": 0.7051048755645752,
+        "hits_1": 0.5854112863540649,
+        "hits_3": 0.7840877175331116,
+        "hits_10": 0.9381907939910888,
+        "auroc": 0.969575758113141
+      }
+    },
+    "v9": {
+      "code": "class FusionV9(nn.Module):\n    def __init__(self, hidden_dim):\n        super().__init__()\n\n        self.text_score = nn.Linear(\n            hidden_dim,\n            hidden_dim\n        )\n\n        self.domain_score = nn.Linear(\n            hidden_dim,\n            hidden_dim\n        )\n\n    def forward(self, text_x, domain_x):\n        text_logit = self.text_score(text_x)\n        domain_logit = self.domain_score(domain_x)\n\n        scores = torch.stack(\n            [text_logit, domain_logit],\n            dim=-1\n        )\n\n        weights = torch.softmax(\n            scores,\n            dim=-1\n        )\n\n        text_weight = weights[..., 0]\n        domain_weight = weights[..., 1]\n\n        return (\n            text_weight * text_x\n            + domain_weight * domain_x\n        )\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 3.0418968200683594,
+            "mrr": 0.7133329510688782,
+            "hits_1": 0.5934834480285645,
+            "hits_3": 0.7938004732131958,
+            "hits_10": 0.9439524412155151,
+            "auroc": 0.9739259833784621
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.2688159942626953,
+            "mrr": 0.6979573965072632,
+            "hits_1": 0.5776005983352661,
+            "hits_3": 0.7746984958648682,
+            "hits_10": 0.9353737235069275,
+            "auroc": 0.9678946924124064
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.320565938949585,
+            "mrr": 0.6951318383216858,
+            "hits_1": 0.5759992003440857,
+            "hits_3": 0.770695149898529,
+            "hits_10": 0.9320076107978821,
+            "auroc": 0.9721590175356851
+          }
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 3.23361873626709,
+            "mrr": 0.7066951990127563,
+            "hits_1": 0.5902480483055115,
+            "hits_3": 0.7818392515182495,
+            "hits_10": 0.9358149170875549,
+            "auroc": 0.9676378662798266
+          }
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 3.327232837677002,
+            "mrr": 0.6938254237174988,
+            "hits_1": 0.5722736120223999,
+            "hits_3": 0.7713323831558228,
+            "hits_10": 0.9340174794197083,
+            "auroc": 0.9681435921223613
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.2384260654449464,
+        "mrr": 0.7013885617256165,
+        "hits_1": 0.5819209814071655,
+        "hits_3": 0.778473150730133,
+        "hits_10": 0.9362332344055175,
+        "auroc": 0.9699522303457483
+      }
+    },
+    "v10": {
+      "code": "class FusionV10(nn.Module):\n    def __init__(self, hidden_dim):\n        super().__init__()\n\n        self.gate = nn.Linear(\n            hidden_dim * 2,\n            hidden_dim\n        )\n\n    def forward(self, text_x, domain_x):\n        text_norm = F.normalize(\n            text_x,\n            p=2,\n            dim=-1\n        )\n\n        domain_norm = F.normalize(\n            domain_x,\n            p=2,\n            dim=-1\n        )\n\n        gate = torch.sigmoid(\n            self.gate(\n                torch.cat(\n                    [text_norm, domain_norm],\n                    dim=-1\n                )\n            )\n        )\n\n        return (\n            gate * text_x\n            + (1.0 - gate) * domain_x\n        )\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 2.938445806503296,
+            "mrr": 0.7219680547714233,
+            "hits_1": 0.6036471724510193,
+            "hits_3": 0.8029674291610718,
+            "hits_10": 0.9483479857444763,
+            "auroc": 0.9713515140985426
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 2.987891674041748,
+            "mrr": 0.7170301079750061,
+            "hits_1": 0.5984509587287903,
+            "hits_3": 0.7972809672355652,
+            "hits_10": 0.9459786415100098,
+            "auroc": 0.9702982669952175
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.0309650897979736,
+            "mrr": 0.7174410223960876,
+            "hits_1": 0.6005424857139587,
+            "hits_3": 0.7961861491203308,
+            "hits_10": 0.9435439109802246,
+            "auroc": 0.9696937633908174
+          }
+        },
+        {
+          "seed": 45,
+          "metrics": {
+            "mr": 2.984607458114624,
+            "mrr": 0.7127189040184021,
+            "hits_1": 0.5913265347480774,
+            "hits_3": 0.795271098613739,
+            "hits_10": 0.9473838806152344,
+            "auroc": 0.9701498138519992
+          }
+        },
+        {
+          "seed": 46,
+          "metrics": {
+            "mr": 2.9465994834899902,
+            "mrr": 0.7169544696807861,
+            "hits_1": 0.5961469411849976,
+            "hits_3": 0.8002876043319702,
+            "hits_10": 0.9479721784591675,
+            "auroc": 0.9694364144550475
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 2.9777019023895264,
+        "mrr": 0.7172225117683411,
+        "hits_1": 0.5980228185653687,
+        "hits_3": 0.7983986496925354,
+        "hits_10": 0.9466453194618225,
+        "auroc": 0.9701859545583249
+      }
+    }
+  }
+}

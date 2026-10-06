@@ -68,8 +68,8 @@ python task_degree_edge/train_base.py --help
   tính `(1-w) * domain + w * text`. Task bậc mặc định học trên subgraph
   (LukePi, `--degree_on_full false`).
 - **Upgrade** — `train_upgrade.py` + `model_base4.py`: FusionGate và nhánh PPR.
-  Mặc định degree head học trên toàn graph train (`--degree_on_full true`) để
-  mọi node nhận supervision, khớp lúc TEST.
+  Mặc định degree head học trên subgraph (`--degree_on_full false`), giống base.
+  PPR chạy trên graph đã mask bằng phép lan truyền đặc trưng, không dựng PPR toàn graph train.
 
 Sửa kiến trúc SSL chỉ trong thư mục này; DistMult (nhiệm vụ 1) không bị ảnh
 hưởng.
@@ -114,7 +114,7 @@ python task_degree_edge/train_upgrade.py \
   --negative_sample 1 \
   --num_degree_bins 10 \
   --degree_bin_strategy quantile \
-  --degree_on_full true \
+  --degree_on_full false \
   --use_ppr true \
   --ppr_iterative true \
   --w 0.75 \
@@ -142,9 +142,9 @@ python task_degree_edge/train_upgrade.py \
   `--negative_sample`.
 - `--eval_max_triples`: giới hạn số triple valid/test mỗi lần SSL edge eval
   (mặc định 5000).
-- `--degree_on_full`: upgrade mặc định `true` (học bậc trên toàn graph train).
-  Base mặc định `false` (LukePi: học bậc trên subgraph). Đừng bật cùng lúc cho
-  cả hai nếu muốn so sánh encoder; đó là chỗ upgrade khác base.
+- `--degree_on_full`: cả hai script mặc định `false` để so sánh cùng supervision.
+  Bật `true` cho cả hai nếu cần giám sát toàn graph; chế độ này có gradient encoder
+  và tốn VRAM hơn.
 - `--w`, `--freeze`, `--n_hidden`, `--num_hidden_layers`, `--dropout`: giống
   nhiệm vụ 1.
 - `--use_ppr`, `--ppr_c`, `--ppr_eps`, `--ppr_num_layers`, `--ppr_iterative`,
@@ -199,4 +199,48 @@ cuối được lưu thêm với hậu tố `_final`, ví dụ `ssl_model_state_
 checkpoints/<dataset>/<embedding>/
   ssl_base/         # SSL degree+edge base
   ssl_upgrade/      # SSL degree+edge upgrade
+```
+
+## Benchmark kiến trúc có kiểm soát
+
+`benchmark.py` chạy một model mỗi lần, mặc định SUPPKG + PubMedBERT, 50 bước,
+seed 42, batch 1024, mask 0.2, một negative, hidden 200, hai lớp R-GCN,
+10 bucket quantile và w=0.75. Mỗi bước dùng cùng batch cho mọi kiến trúc.
+Checkpoint chọn theo CE cạnh validation trên cùng 5.000 cạnh và mẫu âm cố định.
+Không chấm test nếu chưa bật `--test`. Ví dụ chạy từ `fuselinker/`:
+
+```powershell
+python task_degree_edge/benchmark.py --model task_degree_edge/model.py --output experiments/degree_edge/base42.json
+python task_degree_edge/benchmark.py --model task_degree_edge/model_base4.py --ppr --output experiments/degree_edge/upgrade42.json
+```
+
+Chỉ sau khi chốt kiến trúc, dùng `--checkpoint ...pth --test --output ...json`
+để chấm checkpoint đã chọn. Lặp lại `--seed 7` và `--seed 2026` để kiểm tra
+độ nhạy với khởi tạo; không chọn seed tốt nhất để báo cáo.
+
+### Thay đổi tương thích cần biết
+
+- FusionGate khởi tạo đúng `w`, sau đó học offset trong không gian logit.
+- PPR tính `S X` bằng lặp `h = c M h + (1-c) X` trên graph hiện tại, gồm
+  self-loop. Train chỉ nhìn cạnh còn lại sau mask; validation/test chỉ nhìn
+  graph train. Cách này không cần ma trận N×N hoặc lấy mẫu fanout ở nhánh PPR.
+  Các cạnh song song được tính theo multiplicity, không sparsify theo top-k.
+- `--ppr_c`, `--ppr_num_layers`, `--ppr_iter_num` còn hiệu lực; mặc định 8 vòng.
+  `--ppr_eps`, `--ppr_batch_size`, `--ppr_iterative` chỉ còn nhận để tương thích
+  lệnh cũ. Các helper dựng PPR tường minh vẫn được giữ để dùng độc lập.
+- Edge head giữ đường concat có thứ tự và bổ sung đường tương tác tích/độ lệch
+  giữa hai endpoint. Cần train lại head; checkpoint SSL cũ không tương đương
+  kiến trúc mới dù một số tên trọng số encoder còn giống nhau.
+- `--seed` mặc định 42 cho cả hai script. Validation và test dùng RNG riêng cố định.
+- `encode_full_train_graph` chỉ ngắt gradient khi eval; degree loss khi train
+  full graph giờ truyền được về encoder.
+- `train_base.py` / `train_upgrade.py` vẫn in TEST của iteration cuối theo
+  hành vi cũ. Benchmark chấm checkpoint tốt nhất trên validation.
+- Degree metric hiện đánh giá bucket của các node trên graph train; không phải
+  phép đánh giá tổng quát hóa sang node/graph chưa thấy.
+
+Kiểm tra hồi quy trên CPU:
+
+```powershell
+python -m unittest discover -s task_degree_edge -p test_model_base4.py -v
 ```

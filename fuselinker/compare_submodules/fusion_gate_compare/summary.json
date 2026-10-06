@@ -1,0 +1,291 @@
+{
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "variants": {
+    "fixed": {
+      "code": "fused = (1 - w) * domain_x + w * text_x\n# w = 0.75\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 2.926255702972412,
+            "mrr": 0.7342876195907593,
+            "hits_1": 0.6234681010246277,
+            "hits_3": 0.8089970350265503,
+            "hits_10": 0.9466812610626221,
+            "auroc": 0.967216847370501
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 2.8302559852600098,
+            "mrr": 0.7425141334533691,
+            "hits_1": 0.6330762505531311,
+            "hits_3": 0.8182457089424133,
+            "hits_10": 0.9493610858917236,
+            "auroc": 0.9687209713728983
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.071946859359741,
+            "mrr": 0.7174896001815796,
+            "hits_1": 0.6006568670272827,
+            "hits_3": 0.7961698174476624,
+            "hits_10": 0.941713809967041,
+            "auroc": 0.9710435867577277
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 2.942819515864054,
+        "mrr": 0.731430451075236,
+        "hits_1": 0.6190670728683472,
+        "hits_3": 0.8078041871388754,
+        "hits_10": 0.9459187189737955,
+        "auroc": 0.968993801833709
+      }
+    },
+    "channel_alpha": {
+      "code": "class ChannelAlphaFusion(nn.Module):\n    \"\"\"One mix weight per hidden channel, shared by every node.\"\"\"\n\n    def __init__(self, hidden_dim, dropout=0.2):\n        super().__init__()\n        del dropout\n        self.alpha = nn.Parameter(torch.full((hidden_dim,), _logit(0.75)))\n\n    def forward(self, text_x, domain_x, w=None):\n        del w\n        alpha = torch.sigmoid(self.alpha)\n        return alpha * text_x + (1.0 - alpha) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 2.9724173545837402,
+            "mrr": 0.7250812649726868,
+            "hits_1": 0.6096604466438293,
+            "hits_3": 0.8030981421470642,
+            "hits_10": 0.9451615810394287,
+            "auroc": 0.9682578852303796
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 2.8974802494049072,
+            "mrr": 0.7321140170097351,
+            "hits_1": 0.6179940700531006,
+            "hits_3": 0.811219334602356,
+            "hits_10": 0.9488708972930908,
+            "auroc": 0.9714256608345266
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.0630249977111816,
+            "mrr": 0.7162625789642334,
+            "hits_1": 0.599284291267395,
+            "hits_3": 0.794650137424469,
+            "hits_10": 0.9422366619110107,
+            "auroc": 0.9680771715524177
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 2.9776408672332764,
+        "mrr": 0.7244859536488851,
+        "hits_1": 0.608979602654775,
+        "hits_3": 0.8029892047246298,
+        "hits_10": 0.9454230467478434,
+        "auroc": 0.9692535725391079
+      }
+    },
+    "node_scalar": {
+      "code": "class NodeScalarFusion(nn.Module):\n    \"\"\"One scalar gate per node. Starts at 0.75 while the weight is zero.\"\"\"\n\n    def __init__(self, hidden_dim, dropout=0.2):\n        super().__init__()\n        del dropout\n        self.gate = nn.Linear(hidden_dim * 2, 1)\n        nn.init.zeros_(self.gate.weight)\n        nn.init.constant_(self.gate.bias, _logit(0.75))\n\n    def forward(self, text_x, domain_x, w=None):\n        del w\n        gate = torch.sigmoid(self.gate(torch.cat([text_x, domain_x], dim=-1)))\n        return gate * text_x + (1.0 - gate) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 3.0534167289733887,
+            "mrr": 0.7125627398490906,
+            "hits_1": 0.5927154421806335,
+            "hits_3": 0.7939965128898621,
+            "hits_10": 0.9427432417869568,
+            "auroc": 0.9694959504706233
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.1850876808166504,
+            "mrr": 0.6980603933334351,
+            "hits_1": 0.574316143989563,
+            "hits_3": 0.7799928188323975,
+            "hits_10": 0.9391483664512634,
+            "auroc": 0.9652726624606668
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.255155324935913,
+            "mrr": 0.6901512145996094,
+            "hits_1": 0.5644792318344116,
+            "hits_3": 0.7732932567596436,
+            "hits_10": 0.9368933439254761,
+            "auroc": 0.9691925174215832
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.164553244908651,
+        "mrr": 0.7002581159273783,
+        "hits_1": 0.5771702726682028,
+        "hits_3": 0.7824275294939677,
+        "hits_10": 0.9395949840545654,
+        "auroc": 0.9679870434509578
+      }
+    },
+    "node_channel": {
+      "code": "class NodeChannelFusion(nn.Module):\n    \"\"\"Per-node, per-channel linear gate. Starts at 0.75 while the weight is zero.\"\"\"\n\n    def __init__(self, hidden_dim, dropout=0.2):\n        super().__init__()\n        del dropout\n        self.gate = nn.Linear(hidden_dim * 2, hidden_dim)\n        nn.init.zeros_(self.gate.weight)\n        nn.init.constant_(self.gate.bias, _logit(0.75))\n\n    def forward(self, text_x, domain_x, w=None):\n        del w\n        gate = torch.sigmoid(self.gate(torch.cat([text_x, domain_x], dim=-1)))\n        return gate * text_x + (1.0 - gate) * domain_x\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 3.002434730529785,
+            "mrr": 0.709014356136322,
+            "hits_1": 0.5863263607025146,
+            "hits_3": 0.7923951745033264,
+            "hits_10": 0.9449655413627625,
+            "auroc": 0.9669689254466961
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.363966226577759,
+            "mrr": 0.6928418874740601,
+            "hits_1": 0.5728618502616882,
+            "hits_3": 0.7691591382026672,
+            "hits_10": 0.9306023120880127,
+            "auroc": 0.967497859158318
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 4.003448009490967,
+            "mrr": 0.6692671775817871,
+            "hits_1": 0.5520114898681641,
+            "hits_3": 0.7376875281333923,
+            "hits_10": 0.9050785899162292,
+            "auroc": 0.9553944654682944
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.4566163221995034,
+        "mrr": 0.690374473730723,
+        "hits_1": 0.5703999002774557,
+        "hits_3": 0.766413946946462,
+        "hits_10": 0.9268821477890015,
+        "auroc": 0.9632870833577695
+      }
+    },
+    "fusion_gate_py": {
+      "code": "class FusionGatePy(nn.Module):\n    \"\"\"Verbatim copy of fuselinker/Fusion Gate.py.\"\"\"\n\n    def __init__(self, hidden_dim, dropout=0.2):\n        super().__init__()\n        fusion_in = hidden_dim * 4\n        self.gate = nn.Sequential(\n            nn.Linear(fusion_in, hidden_dim),\n            nn.ReLU(True),\n            nn.Dropout(dropout),\n            nn.Linear(hidden_dim, hidden_dim),\n            nn.Sigmoid(),\n        )\n        self.residual = nn.Sequential(\n            nn.Linear(hidden_dim * 2, hidden_dim),\n            nn.ReLU(True),\n            nn.Dropout(dropout),\n            nn.Linear(hidden_dim, hidden_dim),\n        )\n        self.norm = nn.LayerNorm(hidden_dim)\n\n    def forward(self, text_x, domain_x, w=None):\n        stats = torch.cat(\n            [text_x, domain_x, torch.abs(text_x - domain_x), text_x * domain_x],\n            dim=-1,\n        )\n        gate = self.gate(stats)\n        if w is not None:\n            gate = 0.5 * gate + 0.5 * w\n        fused = gate * text_x + (1.0 - gate) * domain_x\n        fused = fused + self.residual(torch.cat([text_x, domain_x], dim=-1))\n        return self.norm(fused)\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 3.700300693511963,
+            "mrr": 0.6596210598945618,
+            "hits_1": 0.5311774611473083,
+            "hits_3": 0.7380470037460327,
+            "hits_10": 0.9188699126243591,
+            "auroc": 0.9613226349736615
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 3.768913984298706,
+            "mrr": 0.6583811640739441,
+            "hits_1": 0.5304585099220276,
+            "hits_3": 0.7355305552482605,
+            "hits_10": 0.9163371324539185,
+            "auroc": 0.9599350805961354
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.428886651992798,
+            "mrr": 0.6720604300498962,
+            "hits_1": 0.5426321029663086,
+            "hits_3": 0.7531618475914001,
+            "hits_10": 0.931501030921936,
+            "auroc": 0.9633850182619212
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.6327004432678223,
+        "mrr": 0.663354218006134,
+        "hits_1": 0.5347560246785482,
+        "hits_3": 0.7422464688618978,
+        "hits_10": 0.9222360253334045,
+        "auroc": 0.9615475779439061
+      }
+    },
+    "additive_residual": {
+      "code": "class AdditiveResidualFusion(nn.Module):\n    \"\"\"Fixed w-mix plus a residual MLP whose last layer starts at zero.\"\"\"\n\n    def __init__(self, hidden_dim, dropout=0.2):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(hidden_dim * 2, hidden_dim),\n            nn.ReLU(True),\n            nn.Dropout(dropout),\n            nn.Linear(hidden_dim, hidden_dim),\n        )\n        nn.init.zeros_(self.net[-1].weight)\n        nn.init.zeros_(self.net[-1].bias)\n\n    def forward(self, text_x, domain_x, w=None):\n        mix = 0.75 if w is None else w\n        base = (1.0 - mix) * domain_x + mix * text_x\n        delta = self.net(torch.cat([text_x, domain_x], dim=-1))\n        return base + delta\n",
+      "runs": [
+        {
+          "seed": 42,
+          "metrics": {
+            "mr": 3.061962842941284,
+            "mrr": 0.7148618698120117,
+            "hits_1": 0.596392035484314,
+            "hits_3": 0.7936370372772217,
+            "hits_10": 0.9430537223815918,
+            "auroc": 0.9633215887243244
+          }
+        },
+        {
+          "seed": 43,
+          "metrics": {
+            "mr": 2.9086570739746094,
+            "mrr": 0.7255497574806213,
+            "hits_1": 0.6104774475097656,
+            "hits_3": 0.803817093372345,
+            "hits_10": 0.9481192231178284,
+            "auroc": 0.9643305849966586
+          }
+        },
+        {
+          "seed": 44,
+          "metrics": {
+            "mr": 3.0664563179016113,
+            "mrr": 0.7048961520195007,
+            "hits_1": 0.5824699997901917,
+            "hits_3": 0.7861858010292053,
+            "hits_10": 0.9436909556388855,
+            "auroc": 0.96765061648306
+          }
+        }
+      ],
+      "missing_seeds": [],
+      "mean": {
+        "mr": 3.0123587449391684,
+        "mrr": 0.7151025931040446,
+        "hits_1": 0.5964464942614237,
+        "hits_3": 0.794546643892924,
+        "hits_10": 0.9449546337127686,
+        "auroc": 0.9651009300680143
+      }
+    }
+  }
+}

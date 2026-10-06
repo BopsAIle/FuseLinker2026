@@ -1,0 +1,319 @@
+{
+  "dataset": "suppkg",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "embeddings": [
+    "bert_pretrained_embeddings_768",
+    "pubmedbert_pretrained_embeddings_768"
+  ],
+  "protocol": "suppKG (data=suppkg), 40000 iterations, evaluate_every=1000, num_hidden_layers=2, w=0.75, knowledge=poincare_embeddings.npy, fusion=fixed, domain map=Linear. Hidden layers are RelGraphConv in model.py, and ResidualRelGraphConvBlock (LayerNorm, RelGraphConv, residual, FFN, residual, ReLU on every layer except the last) when --use_residual_rgcn true.",
+  "checkpoint_root": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg",
+  "notes_dir": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/residual_rgcn_5seed_suppkg",
+  "results": {
+    "bert_pretrained_embeddings_768": {
+      "model": {
+        "label": "model.py",
+        "runs": [
+          {
+            "seed": 42,
+            "metrics": {
+              "mr": 2.957155466079712,
+              "mrr": 0.7245373129844666,
+              "hits_1": 0.6087453961372375,
+              "hits_3": 0.803702712059021,
+              "hits_10": 0.9464198350906372,
+              "auroc": 0.9679138940817676
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/seed_42/metrics.json"
+          },
+          {
+            "seed": 43,
+            "metrics": {
+              "mr": 2.924687147140503,
+              "mrr": 0.7336456179618835,
+              "hits_1": 0.6210170388221741,
+              "hits_3": 0.8108598589897156,
+              "hits_10": 0.9467629790306091,
+              "auroc": 0.9698530869954622
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/seed_43/metrics.json"
+          },
+          {
+            "seed": 44,
+            "metrics": {
+              "mr": 2.93674635887146,
+              "mrr": 0.7224596738815308,
+              "hits_1": 0.605215847492218,
+              "hits_3": 0.8021830916404724,
+              "hits_10": 0.9467629790306091,
+              "auroc": 0.9691787365644613
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/seed_44/metrics.json"
+          },
+          {
+            "seed": 45,
+            "metrics": {
+              "mr": 2.9719924926757812,
+              "mrr": 0.7236146330833435,
+              "hits_1": 0.6076832413673401,
+              "hits_3": 0.8036047220230103,
+              "hits_10": 0.944949209690094,
+              "auroc": 0.9678918482348884
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/seed_45/metrics.json"
+          },
+          {
+            "seed": 46,
+            "metrics": {
+              "mr": 3.0410635471343994,
+              "mrr": 0.7175460457801819,
+              "hits_1": 0.5991535782814026,
+              "hits_3": 0.7986372113227844,
+              "hits_10": 0.9448021054267883,
+              "auroc": 0.9696215556725892
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/seed_46/metrics.json"
+          }
+        ],
+        "missing_seeds": [],
+        "mean": {
+          "mr": 2.966329002380371,
+          "mrr": 0.7243606567382812,
+          "hits_1": 0.6083630204200745,
+          "hits_3": 0.8037975192070007,
+          "hits_10": 0.9459394216537476,
+          "auroc": 0.9688918243098337
+        }
+      },
+      "model_plus_residual_rgcn": {
+        "label": "model.py + Residual R-GCN",
+        "runs": [
+          {
+            "seed": 42,
+            "metrics": {
+              "mr": 2.8656492233276367,
+              "mrr": 0.7557722330093384,
+              "hits_1": 0.6511160731315613,
+              "hits_3": 0.8291937708854675,
+              "hits_10": 0.9496225118637085,
+              "auroc": 0.9867564563932406
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_42/metrics.json"
+          },
+          {
+            "seed": 43,
+            "metrics": {
+              "mr": 2.9524166584014893,
+              "mrr": 0.7299141883850098,
+              "hits_1": 0.6142847537994385,
+              "hits_3": 0.810876190662384,
+              "hits_10": 0.9480375051498413,
+              "auroc": 0.9873088238633769
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_43/metrics.json"
+          },
+          {
+            "seed": 44,
+            "metrics": {
+              "mr": 3.3307623863220215,
+              "mrr": 0.7200258374214172,
+              "hits_1": 0.6088597774505615,
+              "hits_3": 0.7946828603744507,
+              "hits_10": 0.9305532574653625,
+              "auroc": 0.9830857280997415
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_44/metrics.json"
+          },
+          {
+            "seed": 45,
+            "metrics": {
+              "mr": 3.0738422870635986,
+              "mrr": 0.7380646467208862,
+              "hits_1": 0.6290074586868286,
+              "hits_3": 0.8146017789840698,
+              "hits_10": 0.94151771068573,
+              "auroc": 0.9859071052041217
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_45/metrics.json"
+          },
+          {
+            "seed": 46,
+            "metrics": {
+              "mr": 3.2496650218963623,
+              "mrr": 0.7239071130752563,
+              "hits_1": 0.6122095584869385,
+              "hits_3": 0.7993234992027283,
+              "hits_10": 0.9343279004096985,
+              "auroc": 0.9830356180280957
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/bert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_46/metrics.json"
+          }
+        ],
+        "missing_seeds": [],
+        "mean": {
+          "mr": 3.094467115402222,
+          "mrr": 0.7335368037223816,
+          "hits_1": 0.6230955243110656,
+          "hits_3": 0.8097356200218201,
+          "hits_10": 0.9408117771148682,
+          "auroc": 0.9852187463177152
+        }
+      }
+    },
+    "pubmedbert_pretrained_embeddings_768": {
+      "model": {
+        "label": "model.py",
+        "runs": [
+          {
+            "seed": 42,
+            "metrics": {
+              "mr": 2.6954638957977295,
+              "mrr": 0.7407070994377136,
+              "hits_1": 0.626670777797699,
+              "hits_3": 0.8207620978355408,
+              "hits_10": 0.9555050730705261,
+              "auroc": 0.9715203314673475
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/seed_42/metrics.json"
+          },
+          {
+            "seed": 43,
+            "metrics": {
+              "mr": 3.0980098247528076,
+              "mrr": 0.7129809856414795,
+              "hits_1": 0.5952808856964111,
+              "hits_3": 0.791725218296051,
+              "hits_10": 0.9406516551971436,
+              "auroc": 0.9678470163927936
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/seed_43/metrics.json"
+          },
+          {
+            "seed": 44,
+            "metrics": {
+              "mr": 2.9611425399780273,
+              "mrr": 0.7278421521186829,
+              "hits_1": 0.6149874329566956,
+              "hits_3": 0.8034412860870361,
+              "hits_10": 0.9453413486480713,
+              "auroc": 0.970157371268491
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/seed_44/metrics.json"
+          },
+          {
+            "seed": 45,
+            "metrics": {
+              "mr": 2.9981698989868164,
+              "mrr": 0.7184021472930908,
+              "hits_1": 0.5999869108200073,
+              "hits_3": 0.7990620732307434,
+              "hits_10": 0.9443772435188293,
+              "auroc": 0.9728095267527743
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/seed_45/metrics.json"
+          },
+          {
+            "seed": 46,
+            "metrics": {
+              "mr": 2.844684362411499,
+              "mrr": 0.7266985177993774,
+              "hits_1": 0.60825514793396,
+              "hits_3": 0.8098466992378235,
+              "hits_10": 0.9521062970161438,
+              "auroc": 0.9696909411080192
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/seed_46/metrics.json"
+          }
+        ],
+        "missing_seeds": [],
+        "mean": {
+          "mr": 2.919494104385376,
+          "mrr": 0.7253261804580688,
+          "hits_1": 0.6090362310409546,
+          "hits_3": 0.8049674749374389,
+          "hits_10": 0.9475963234901428,
+          "auroc": 0.970405037397885
+        }
+      },
+      "model_plus_residual_rgcn": {
+        "label": "model.py + Residual R-GCN",
+        "runs": [
+          {
+            "seed": 42,
+            "metrics": {
+              "mr": 2.7707114219665527,
+              "mrr": 0.7550914287567139,
+              "hits_1": 0.6483708620071411,
+              "hits_3": 0.831595778465271,
+              "hits_10": 0.9511748552322388,
+              "auroc": 0.9879677614795963
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_42/metrics.json"
+          },
+          {
+            "seed": 43,
+            "metrics": {
+              "mr": 2.8652408123016357,
+              "mrr": 0.7482835054397583,
+              "hits_1": 0.6399555802345276,
+              "hits_3": 0.8259257078170776,
+              "hits_10": 0.9490996599197388,
+              "auroc": 0.9873415153502904
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_43/metrics.json"
+          },
+          {
+            "seed": 44,
+            "metrics": {
+              "mr": 2.5817184448242188,
+              "mrr": 0.7694658637046814,
+              "hits_1": 0.6673747301101685,
+              "hits_3": 0.8430994749069214,
+              "hits_10": 0.9584299921989441,
+              "auroc": 0.9895439698421657
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_44/metrics.json"
+          },
+          {
+            "seed": 45,
+            "metrics": {
+              "mr": 2.4760775566101074,
+              "mrr": 0.7787679433822632,
+              "hits_1": 0.6777836084365845,
+              "hits_3": 0.8537207245826721,
+              "hits_10": 0.9621719717979431,
+              "auroc": 0.9894126800232868
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_45/metrics.json"
+          },
+          {
+            "seed": 46,
+            "metrics": {
+              "mr": 2.5122389793395996,
+              "mrr": 0.7725850939750671,
+              "hits_1": 0.6699892282485962,
+              "hits_3": 0.84793621301651,
+              "hits_10": 0.9610444903373718,
+              "auroc": 0.9888119941104143
+            },
+            "path": "/home/anhlq/Documents/2026-ltt/FuseLinker2026/fuselinker/compare_submodules/checkpoints/suppkg/pubmedbert_pretrained_embeddings_768/compare_model/residual_rgcn/seed_46/metrics.json"
+          }
+        ],
+        "missing_seeds": [],
+        "mean": {
+          "mr": 2.641197443008423,
+          "mrr": 0.7648387670516967,
+          "hits_1": 0.6606948018074036,
+          "hits_3": 0.8404555797576905,
+          "hits_10": 0.9563841938972473,
+          "auroc": 0.9886155841611506
+        }
+      }
+    }
+  }
+}
