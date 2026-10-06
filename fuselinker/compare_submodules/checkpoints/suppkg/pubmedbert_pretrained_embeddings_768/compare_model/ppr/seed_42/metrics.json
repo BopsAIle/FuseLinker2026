@@ -1,0 +1,24 @@
+{
+  "encoder": "model",
+  "seed": 42,
+  "fusion_variant": "fixed",
+  "use_domain_mlp_projector": false,
+  "domain_map": "linear",
+  "use_residual_rgcn": false,
+  "rgcn_block": "rel_graph_conv",
+  "use_ppr": true,
+  "ppr_num_layers": 2,
+  "ppr_c": 0.15,
+  "ppr_eps": 0.0001,
+  "ppr_num_iter": 50,
+  "ppr_topk": 50,
+  "ppr_batch_size": 128,
+  "mr": 3.093271017074585,
+  "mrr": 0.7344273328781128,
+  "hits": {
+    "1": 0.6255760192871094,
+    "3": 0.809830367565155,
+    "10": 0.940128743648529
+  },
+  "auroc": 0.9758022252342925
+}
