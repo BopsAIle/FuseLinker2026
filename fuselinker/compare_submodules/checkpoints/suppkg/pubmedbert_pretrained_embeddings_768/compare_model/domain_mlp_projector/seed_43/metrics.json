@@ -1,0 +1,15 @@
+{
+  "encoder": "model",
+  "seed": 43,
+  "fusion_variant": "fixed",
+  "use_domain_mlp_projector": true,
+  "domain_map": "domain_mlp_projector",
+  "mr": 2.7954182624816895,
+  "mrr": 0.7342535853385925,
+  "hits": {
+    "1": 0.6172423958778381,
+    "3": 0.81734699010849,
+    "10": 0.9532827734947205
+  },
+  "auroc": 0.970865690556406
+}
